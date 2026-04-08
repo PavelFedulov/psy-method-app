@@ -15,12 +15,15 @@
     "better-sqlite3": "^12.8.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "csv-stringify": "^6.7.0",
     "dotenv": "^16.4.0",
+    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "uuid": "^11.1.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
