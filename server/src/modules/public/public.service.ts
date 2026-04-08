@@ -1,5 +1,11 @@
 import type Database from "better-sqlite3";
-import { LINK_STATUS, SESSION_STATUS } from "../../constants/app.constants";
+import { z } from "zod";
+import {
+  LINK_STATUS,
+  SESSION_STATUS,
+  TOTAL_STEPS,
+} from "../../constants/app.constants";
+import { getStimulusByStep } from "../../constants/stimuli";
 import { nowIso } from "../../utils/now";
 
 type ParticipantLinkRow = {
@@ -22,8 +28,15 @@ type ParticipantSessionRow = {
   completed_at: string | null;
 };
 
-export function getPublicLinkState(db: Database.Database, token: string) {
-  const link = db
+const submitStepSchema = z.object({
+  finalValue: z.number().finite(),
+  clicksMore: z.number().int().min(0),
+  clicksLess: z.number().int().min(0),
+  timeSpentSeconds: z.number().int().min(0),
+});
+
+function getLinkByToken(db: Database.Database, token: string) {
+  return db
     .prepare(
       `
       SELECT id, token, status, started_at, completed_at, revoked_at
@@ -32,14 +45,10 @@ export function getPublicLinkState(db: Database.Database, token: string) {
       `,
     )
     .get(token) as ParticipantLinkRow | undefined;
+}
 
-  if (!link) {
-    return {
-      state: "not_found" as const,
-    };
-  }
-
-  const session = db
+function getSessionByLinkId(db: Database.Database, linkId: number) {
+  return db
     .prepare(
       `
       SELECT id, link_id, participant_code, current_step, status, started_at, last_activity_at, completed_at
@@ -48,7 +57,19 @@ export function getPublicLinkState(db: Database.Database, token: string) {
       LIMIT 1
       `,
     )
-    .get(link.id) as ParticipantSessionRow | undefined;
+    .get(linkId) as ParticipantSessionRow | undefined;
+}
+
+export function getPublicLinkState(db: Database.Database, token: string) {
+  const link = getLinkByToken(db, token);
+
+  if (!link) {
+    return {
+      state: "not_found" as const,
+    };
+  }
+
+  const session = getSessionByLinkId(db, link.id);
 
   if (link.status === LINK_STATUS.REVOKED) {
     return {
@@ -108,15 +129,7 @@ export function startPublicSession(
     throw new Error("Необходимо принять информированное согласие");
   }
 
-  const link = db
-    .prepare(
-      `
-      SELECT id, token, status
-      FROM participant_links
-      WHERE token = ?
-      `,
-    )
-    .get(token) as { id: number; token: string; status: string } | undefined;
+  const link = getLinkByToken(db, token);
 
   if (!link) {
     throw new Error("Ссылка не найдена");
@@ -130,23 +143,7 @@ export function startPublicSession(
     throw new Error("Прохождение по ссылке уже завершено");
   }
 
-  const existingSessionByLink = db
-    .prepare(
-      `
-      SELECT id, participant_code, current_step, status
-      FROM participant_sessions
-      WHERE link_id = ?
-      LIMIT 1
-      `,
-    )
-    .get(link.id) as
-    | {
-        id: number;
-        participant_code: string;
-        current_step: number;
-        status: string;
-      }
-    | undefined;
+  const existingSessionByLink = getSessionByLinkId(db, link.id);
 
   if (existingSessionByLink) {
     if (existingSessionByLink.participant_code !== participantCode) {
@@ -229,15 +226,7 @@ export function startPublicSession(
 }
 
 export function getPublicSessionProgress(db: Database.Database, token: string) {
-  const link = db
-    .prepare(
-      `
-      SELECT id, token, status
-      FROM participant_links
-      WHERE token = ?
-      `,
-    )
-    .get(token) as { id: number; token: string; status: string } | undefined;
+  const link = getLinkByToken(db, token);
 
   if (!link) {
     return {
@@ -251,24 +240,7 @@ export function getPublicSessionProgress(db: Database.Database, token: string) {
     };
   }
 
-  const session = db
-    .prepare(
-      `
-      SELECT id, participant_code, current_step, status, completed_at
-      FROM participant_sessions
-      WHERE link_id = ?
-      LIMIT 1
-      `,
-    )
-    .get(link.id) as
-    | {
-        id: number;
-        participant_code: string;
-        current_step: number;
-        status: string;
-        completed_at: string | null;
-      }
-    | undefined;
+  const session = getSessionByLinkId(db, link.id);
 
   if (!session) {
     return {
@@ -301,4 +273,221 @@ export function getPublicSessionProgress(db: Database.Database, token: string) {
       status: session.status,
     },
   };
+}
+
+export function getPublicStep(
+  db: Database.Database,
+  token: string,
+  requestedStepNumber: number,
+) {
+  if (
+    !Number.isInteger(requestedStepNumber) ||
+    requestedStepNumber < 1 ||
+    requestedStepNumber > TOTAL_STEPS
+  ) {
+    throw new Error("Некорректный номер шага");
+  }
+
+  const link = getLinkByToken(db, token);
+
+  if (!link) {
+    throw new Error("Ссылка не найдена");
+  }
+
+  if (link.status === LINK_STATUS.REVOKED) {
+    throw new Error("Ссылка отозвана");
+  }
+
+  const session = getSessionByLinkId(db, link.id);
+
+  if (!session) {
+    throw new Error("Сессия еще не начата");
+  }
+
+  if (
+    session.status === SESSION_STATUS.COMPLETED ||
+    link.status === LINK_STATUS.COMPLETED
+  ) {
+    throw new Error("Прохождение уже завершено");
+  }
+
+  if (requestedStepNumber !== session.current_step) {
+    throw new Error(`Сейчас доступен только шаг ${session.current_step}`);
+  }
+
+  const stimulus = getStimulusByStep(requestedStepNumber);
+
+  if (!stimulus) {
+    throw new Error("Конфиг шага не найден");
+  }
+
+  return {
+    stepNumber: requestedStepNumber,
+    totalSteps: TOTAL_STEPS,
+    participantCode: session.participant_code,
+    stimulus: {
+      stepNumber: stimulus.stepNumber,
+      stimulusType: stimulus.stimulusType,
+      stimulusLabel: stimulus.stimulusLabel,
+      adjustablePartLabel: stimulus.adjustablePartLabel,
+      referenceValue: stimulus.referenceValue,
+      stepSize: stimulus.stepSize,
+    },
+  };
+}
+
+export function submitPublicStep(
+  db: Database.Database,
+  token: string,
+  requestedStepNumber: number,
+  input: unknown,
+) {
+  if (
+    !Number.isInteger(requestedStepNumber) ||
+    requestedStepNumber < 1 ||
+    requestedStepNumber > TOTAL_STEPS
+  ) {
+    throw new Error("Некорректный номер шага");
+  }
+
+  const parsed = submitStepSchema.parse(input);
+
+  const link = getLinkByToken(db, token);
+
+  if (!link) {
+    throw new Error("Ссылка не найдена");
+  }
+
+  if (link.status === LINK_STATUS.REVOKED) {
+    throw new Error("Ссылка отозвана");
+  }
+
+  if (link.status === LINK_STATUS.COMPLETED) {
+    throw new Error("Прохождение уже завершено");
+  }
+
+  const session = getSessionByLinkId(db, link.id);
+
+  if (!session) {
+    throw new Error("Сессия еще не начата");
+  }
+
+  if (session.status === SESSION_STATUS.COMPLETED) {
+    throw new Error("Прохождение уже завершено");
+  }
+
+  if (requestedStepNumber !== session.current_step) {
+    throw new Error(`Сейчас доступен только шаг ${session.current_step}`);
+  }
+
+  const stimulus = getStimulusByStep(requestedStepNumber);
+
+  if (!stimulus) {
+    throw new Error("Конфиг шага не найден");
+  }
+
+  const existingStep = db
+    .prepare(
+      `
+      SELECT id
+      FROM session_steps
+      WHERE session_id = ? AND step_number = ?
+      LIMIT 1
+      `,
+    )
+    .get(session.id, requestedStepNumber);
+
+  if (existingStep) {
+    throw new Error("Этот шаг уже сохранен");
+  }
+
+  const clicksTotal = parsed.clicksMore + parsed.clicksLess;
+  const deviation = Math.abs(parsed.finalValue - stimulus.referenceValue);
+  const createdAt = nowIso();
+  const isFinalStep = requestedStepNumber === TOTAL_STEPS;
+
+  const transaction = db.transaction(() => {
+    db.prepare(
+      `
+      INSERT INTO session_steps (
+        session_id,
+        step_number,
+        stimulus_type,
+        stimulus_label,
+        adjustable_part_label,
+        reference_value,
+        final_value,
+        deviation,
+        clicks_more,
+        clicks_less,
+        clicks_total,
+        time_spent_seconds,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    ).run(
+      session.id,
+      requestedStepNumber,
+      stimulus.stimulusType,
+      stimulus.stimulusLabel,
+      stimulus.adjustablePartLabel,
+      stimulus.referenceValue,
+      parsed.finalValue,
+      deviation,
+      parsed.clicksMore,
+      parsed.clicksLess,
+      clicksTotal,
+      parsed.timeSpentSeconds,
+      createdAt,
+    );
+
+    if (isFinalStep) {
+      db.prepare(
+        `
+        UPDATE participant_sessions
+        SET current_step = ?, status = ?, last_activity_at = ?, completed_at = ?
+        WHERE id = ?
+        `,
+      ).run(
+        TOTAL_STEPS,
+        SESSION_STATUS.COMPLETED,
+        createdAt,
+        createdAt,
+        session.id,
+      );
+
+      db.prepare(
+        `
+        UPDATE participant_links
+        SET status = ?, completed_at = ?
+        WHERE id = ?
+        `,
+      ).run(LINK_STATUS.COMPLETED, createdAt, link.id);
+
+      return {
+        savedStepNumber: requestedStepNumber,
+        completed: true,
+        nextStep: null,
+      };
+    }
+
+    const nextStep = requestedStepNumber + 1;
+
+    db.prepare(
+      `
+      UPDATE participant_sessions
+      SET current_step = ?, last_activity_at = ?
+      WHERE id = ?
+      `,
+    ).run(nextStep, createdAt, session.id);
+
+    return {
+      savedStepNumber: requestedStepNumber,
+      completed: false,
+      nextStep,
+    };
+  });
+
+  return transaction();
 }
