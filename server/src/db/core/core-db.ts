@@ -11,3 +11,4 @@ if (!fs.existsSync(dbDir)) {
 
 export const coreDb = new Database(env.coreDbPath);
 coreDb.pragma("journal_mode = WAL");
+coreDb.pragma("foreign_keys = ON");

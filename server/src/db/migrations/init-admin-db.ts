@@ -22,7 +22,7 @@ export function initAdminDb(db: Database.Database) {
       started_at TEXT NOT NULL,
       last_activity_at TEXT NOT NULL,
       completed_at TEXT,
-      FOREIGN KEY (link_id) REFERENCES participant_links(id)
+      FOREIGN KEY (link_id) REFERENCES participant_links(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS session_steps (
@@ -41,7 +41,7 @@ export function initAdminDb(db: Database.Database) {
       time_spent_seconds INTEGER NOT NULL,
       created_at TEXT NOT NULL,
       UNIQUE(session_id, step_number),
-      FOREIGN KEY (session_id) REFERENCES participant_sessions(id)
+      FOREIGN KEY (session_id) REFERENCES participant_sessions(id) ON DELETE CASCADE
     );
   `);
 }

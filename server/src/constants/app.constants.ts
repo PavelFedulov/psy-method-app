@@ -1,4 +1,5 @@
 export const APP_NAME = "psy-method-server";
+export const TOTAL_STEPS = 10;
 
 export const SESSION_STATUS = {
   IN_PROGRESS: "in_progress",
@@ -12,4 +13,7 @@ export const LINK_STATUS = {
   REVOKED: "revoked",
 } as const;
 
-export const TOTAL_STEPS = 10;
+export const COOKIE_NAMES = {
+  ADMIN_SESSION: "admin_session",
+  SUPER_ADMIN_SESSION: "super_admin_session",
+} as const;
