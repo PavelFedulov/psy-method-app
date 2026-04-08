@@ -94,6 +94,32 @@ function resolveSessionIds(
   return ids;
 }
 
+function mapSessionStatus(status: string): string {
+  switch (status) {
+    case "completed":
+      return "завершено";
+    case "in_progress":
+      return "в процессе";
+    default:
+      return status;
+  }
+}
+
+function mapLinkStatus(status: string): string {
+  switch (status) {
+    case "new":
+      return "новая";
+    case "in_progress":
+      return "в процессе";
+    case "completed":
+      return "завершена";
+    case "revoked":
+      return "отозвана";
+    default:
+      return status;
+  }
+}
+
 function buildExportRows(
   db: Database.Database,
   input: ExportInput,
@@ -143,12 +169,12 @@ function buildExportRows(
   return rows.map((row) => ({
     sessionId: row.session_id,
     participantCode: row.participant_code,
-    sessionStatus: row.session_status,
+    sessionStatus: mapSessionStatus(row.session_status),
     sessionStartedAt: row.session_started_at,
     sessionCompletedAt: row.session_completed_at,
     linkId: row.link_id,
     linkToken: row.link_token,
-    linkStatus: row.link_status,
+    linkStatus: mapLinkStatus(row.link_status),
     stepId: row.step_id,
     stepNumber: row.step_number,
     stimulusType: row.stimulus_type,
