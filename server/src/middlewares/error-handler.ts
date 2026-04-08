@@ -8,10 +8,13 @@ export function errorHandler(
 ) {
   console.error(error);
 
-  const message =
-    error instanceof Error ? error.message : "Internal server error";
+  if (error instanceof Error) {
+    return res.status(400).json({
+      error: error.message,
+    });
+  }
 
-  res.status(500).json({
-    error: message,
+  return res.status(500).json({
+    error: "Internal server error",
   });
 }
