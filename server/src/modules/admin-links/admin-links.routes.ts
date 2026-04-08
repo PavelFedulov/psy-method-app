@@ -15,11 +15,15 @@ router.use(attachAdminDb);
 
 router.post("/", (req, res, next) => {
   try {
-    if (!req.adminDb) {
+    if (!req.adminDb || !req.admin) {
       return res.status(500).json({ error: "Admin DB not attached" });
     }
 
-    const link = createParticipantLink(req.adminDb);
+    const link = createParticipantLink({
+      db: req.adminDb,
+      adminId: req.admin.id,
+      dbFileName: req.admin.dbFileName,
+    });
 
     return res.status(201).json({ link });
   } catch (error) {

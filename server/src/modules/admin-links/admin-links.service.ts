@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { coreDb } from "../../db/core/core-db";
 import { LINK_STATUS } from "../../constants/app.constants";
 import { nowIso } from "../../utils/now";
 import { generateParticipantToken } from "../../utils/token";
@@ -13,35 +14,61 @@ type ParticipantLinkRow = {
   revoked_at: string | null;
 };
 
-export function createParticipantLink(db: Database.Database) {
+type CreateParticipantLinkParams = {
+  db: Database.Database;
+  adminId: number;
+  dbFileName: string;
+};
+
+export function createParticipantLink(params: CreateParticipantLinkParams) {
+  const { db, adminId, dbFileName } = params;
+
   const token = generateParticipantToken();
   const createdAt = nowIso();
 
-  const result = db
-    .prepare(
-      `
-      INSERT INTO participant_links (
-        token,
-        status,
-        created_at,
-        started_at,
-        completed_at,
-        revoked_at
+  const transaction = db.transaction(() => {
+    const result = db
+      .prepare(
+        `
+        INSERT INTO participant_links (
+          token,
+          status,
+          created_at,
+          started_at,
+          completed_at,
+          revoked_at
+        )
+        VALUES (?, ?, ?, NULL, NULL, NULL)
+        `,
       )
-      VALUES (?, ?, ?, NULL, NULL, NULL)
-      `,
-    )
-    .run(token, LINK_STATUS.NEW, createdAt);
+      .run(token, LINK_STATUS.NEW, createdAt);
 
-  return {
-    id: Number(result.lastInsertRowid),
-    token,
-    status: LINK_STATUS.NEW,
-    createdAt,
-    startedAt: null,
-    completedAt: null,
-    revokedAt: null,
-  };
+    coreDb
+      .prepare(
+        `
+        INSERT INTO participant_link_index (
+          admin_id,
+          db_file_name,
+          token,
+          created_at
+        )
+        VALUES (?, ?, ?, ?)
+        `,
+      )
+      .run(adminId, dbFileName, token, createdAt);
+
+    return {
+      id: Number(result.lastInsertRowid),
+      token,
+      status: LINK_STATUS.NEW,
+      createdAt,
+      startedAt: null,
+      completedAt: null,
+      revokedAt: null,
+    };
+  });
+
+  return transaction();
 }
 
 export function getParticipantLinks(db: Database.Database) {
@@ -116,7 +143,7 @@ export function deleteUnusedParticipantLink(
   const link = db
     .prepare(
       `
-      SELECT id, status, started_at, completed_at
+      SELECT id, token, status, started_at, completed_at
       FROM participant_links
       WHERE id = ?
       `,
@@ -124,6 +151,7 @@ export function deleteUnusedParticipantLink(
     .get(linkId) as
     | {
         id: number;
+        token: string;
         status: string;
         started_at: string | null;
         completed_at: string | null;
@@ -149,12 +177,25 @@ export function deleteUnusedParticipantLink(
     throw new Error("Можно удалить только неиспользованную ссылку");
   }
 
-  db.prepare(
-    `
-    DELETE FROM participant_links
-    WHERE id = ?
-    `,
-  ).run(linkId);
+  const transaction = db.transaction(() => {
+    db.prepare(
+      `
+      DELETE FROM participant_links
+      WHERE id = ?
+      `,
+    ).run(linkId);
+
+    coreDb
+      .prepare(
+        `
+        DELETE FROM participant_link_index
+        WHERE token = ?
+        `,
+      )
+      .run(link.token);
+  });
+
+  transaction();
 
   return { ok: true };
 }

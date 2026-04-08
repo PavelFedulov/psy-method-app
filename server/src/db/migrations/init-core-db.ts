@@ -35,5 +35,14 @@ export function initCoreDb() {
       expires_at TEXT NOT NULL,
       FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS participant_link_index (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_id INTEGER NOT NULL,
+      db_file_name TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+    );
   `);
 }
