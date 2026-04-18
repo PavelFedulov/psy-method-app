@@ -8,8 +8,8 @@ import {
 } from "../../api/admin-links";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { BackButton } from "../../components/ui/BackButton";
 import { Loader } from "../../components/ui/Loader";
+import { BackButton } from "../../components/ui/BackButton";
 import type { AdminUser } from "../../features/admin-auth/admin-auth.types";
 
 type Props = {
@@ -141,7 +141,7 @@ export function AdminLinksPage({ admin }: Props) {
       window.setTimeout(() => {
         setCopiedToken((prev) => (prev === token ? null : prev));
       }, 1500);
-    } catch (error) {
+    } catch {
       setActionError("Не удалось скопировать ссылку");
     }
   }
@@ -158,123 +158,121 @@ export function AdminLinksPage({ admin }: Props) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Participant-ссылки
-            </h1>
-            <p className="mt-2 text-slate-700">
-              Исследователь: <strong>{admin.username}</strong>
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <BackButton />
-            <Button
-              type="button"
-              onClick={handleCreateLink}
-              disabled={isCreating}
-            >
-              {isCreating ? "Создание..." : "Создать ссылку"}
-            </Button>
-          </div>
+      <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <p className="text-sm font-medium tracking-wide text-slate-500">
+            Ссылки
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            Participant-ссылки
+          </h1>
+          <p className="text-slate-600">
+            Исследователь: <strong>{admin.username}</strong>
+          </p>
         </div>
 
-        {actionError ? (
-          <div className="mt-4 text-sm text-red-600">{actionError}</div>
-        ) : null}
-      </Card>
+        <div className="flex flex-wrap gap-2">
+          <BackButton />
+          <Button
+            type="button"
+            onClick={handleCreateLink}
+            disabled={isCreating}
+          >
+            {isCreating ? "Создание..." : "Создать ссылку"}
+          </Button>
+        </div>
+      </section>
 
-      <Card>
-        {!hasLinks ? (
-          <div className="text-slate-600">
-            Ссылок пока нет. Создайте первую participant-ссылку.
+      {actionError ? (
+        <Card>
+          <div className="text-sm text-red-500">{actionError}</div>
+        </Card>
+      ) : null}
+
+      {!hasLinks ? (
+        <Card>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+              Пока нет ссылок
+            </h2>
+            <p className="text-slate-600">
+              Создайте первую participant-ссылку для выдачи испытуемому.
+            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="px-3 py-3 font-medium">ID</th>
-                  <th className="px-3 py-3 font-medium">Ссылка</th>
-                  <th className="px-3 py-3 font-medium">Статус</th>
-                  <th className="px-3 py-3 font-medium">Создана</th>
-                  <th className="px-3 py-3 font-medium">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {links.map((link) => {
-                  const participantUrl = buildParticipantUrl(link.token);
-                  const canDelete = link.status === "new";
-                  const canRevoke =
-                    link.status === "new" || link.status === "in_progress";
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {links.map((link) => {
+            const participantUrl = buildParticipantUrl(link.token);
+            const canDelete = link.status === "new";
+            const canRevoke =
+              link.status === "new" || link.status === "in_progress";
 
-                  return (
-                    <tr
-                      key={link.id}
-                      className="border-b border-slate-100 align-top"
-                    >
-                      <td className="px-3 py-4 text-slate-900">{link.id}</td>
-
-                      <td className="px-3 py-4">
-                        <div className="max-w-[420px]">
-                          <div className="break-all text-slate-700">
-                            {participantUrl}
-                          </div>
-                          {copiedToken === link.token ? (
-                            <div className="mt-1 text-xs text-green-600">
-                              Скопировано
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td className="px-3 py-4 text-slate-700">
+            return (
+              <Card key={link.id}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="inline-flex rounded-2xl bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                        ID {link.id}
+                      </div>
+                      <div className="text-sm font-medium text-slate-600">
                         {mapLinkStatus(link.status)}
-                      </td>
+                      </div>
+                    </div>
 
-                      <td className="px-3 py-4 text-slate-700">
-                        {link.createdAt}
-                      </td>
-
-                      <td className="px-3 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => handleCopy(link.token)}
-                          >
-                            Копировать
-                          </Button>
-
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => handleRevoke(link.id)}
-                            disabled={!canRevoke}
-                          >
-                            Отозвать
-                          </Button>
-
-                          <Button
-                            type="button"
-                            variant="danger"
-                            onClick={() => handleDelete(link.id)}
-                            disabled={!canDelete}
-                          >
-                            Удалить
-                          </Button>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-slate-500">
+                        Ссылка
+                      </div>
+                      <div className="break-all text-slate-800">
+                        {participantUrl}
+                      </div>
+                      {copiedToken === link.token ? (
+                        <div className="text-xs text-green-600">
+                          Скопировано
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                      ) : null}
+                    </div>
+
+                    <div className="text-sm text-slate-500">
+                      Создана: {link.createdAt}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => handleCopy(link.token)}
+                    >
+                      Копировать
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => handleRevoke(link.id)}
+                      disabled={!canRevoke}
+                    >
+                      Отозвать
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => handleDelete(link.id)}
+                      disabled={!canDelete}
+                    >
+                      Удалить
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

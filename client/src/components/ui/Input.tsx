@@ -7,13 +7,17 @@ type Props = InputHTMLAttributes<HTMLInputElement> & {
 
 export function Input({ label, error, className = "", ...props }: Props) {
   return (
-    <label className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+    <label className="flex flex-col gap-2.5">
+      <span className="text-sm font-medium tracking-tight text-slate-700">
+        {label}
+      </span>
+
       <input
-        className={`rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-500 ${className}`}
+        className={`min-h-12 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-slate-900 shadow-[0_6px_20px_rgba(15,23,42,0.05)] outline-none backdrop-blur-md transition-all placeholder:text-slate-400 focus:border-slate-300 focus:bg-white ${className}`}
         {...props}
       />
-      {error ? <span className="text-sm text-red-600">{error}</span> : null}
+
+      {error ? <span className="text-sm text-red-500">{error}</span> : null}
     </label>
   );
 }

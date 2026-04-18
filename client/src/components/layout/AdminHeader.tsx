@@ -21,11 +21,13 @@ export function AdminHeader({ admin }: Props) {
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-20 border-b border-white/60 bg-white/65 backdrop-blur-2xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <div>
-          <p className="text-sm text-slate-500">Админ-панель исследователя</p>
-          <p className="text-lg font-semibold text-slate-900">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+            Админ-панель
+          </p>
+          <p className="mt-1 text-lg font-semibold tracking-tight text-slate-900">
             {admin.username}
           </p>
         </div>

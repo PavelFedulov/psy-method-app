@@ -74,17 +74,34 @@ export function AdminLoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <Card>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Вход исследователя
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Войдите в админ-панель, чтобы управлять ссылками и результатами.
-          </p>
+    <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-10">
+      <div className="grid w-full max-w-5xl gap-8 md:grid-cols-[1.1fr_0.9fr]">
+        <div className="flex items-center">
+          <div className="space-y-5">
+            <div className="inline-flex rounded-2xl bg-white/70 px-4 py-2 text-sm font-medium text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-xl">
+              Psy Method App
+            </div>
+            <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">
+              Админ-панель исследования
+            </h1>
+            <p className="max-w-lg text-lg leading-8 text-slate-600">
+              Войдите, чтобы управлять participant-ссылками, просматривать
+              результаты и выгружать данные исследования.
+            </p>
+          </div>
+        </div>
 
-          <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+        <Card>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Вход исследователя
+            </h2>
+            <p className="text-sm text-slate-600">
+              Используйте логин и пароль, созданные супер-администратором.
+            </p>
+          </div>
+
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <Input
               label="Логин"
               value={username}
@@ -103,7 +120,7 @@ export function AdminLoginPage() {
             />
 
             {formError ? (
-              <div className="text-sm text-red-600">{formError}</div>
+              <div className="text-sm text-red-500">{formError}</div>
             ) : null}
 
             <Button type="submit" fullWidth disabled={isSubmitting}>
