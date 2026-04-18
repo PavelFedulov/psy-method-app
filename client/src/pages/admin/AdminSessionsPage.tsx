@@ -12,6 +12,7 @@ import {
 } from "../../api/admin-export";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
+import { BackButton } from "../../components/ui/BackButton";
 import { Loader } from "../../components/ui/Loader";
 import type { AdminUser } from "../../features/admin-auth/admin-auth.types";
 
@@ -240,11 +241,17 @@ export function AdminSessionsPage({ admin }: Props) {
     <div className="space-y-6">
       <Card>
         <div className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Прохождения</h1>
-            <p className="mt-2 text-slate-700">
-              Исследователь: <strong>{admin.username}</strong>
-            </p>
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Прохождения</h1>
+              <p className="mt-2 text-slate-700">
+                Исследователь: <strong>{admin.username}</strong>
+              </p>
+            </div>
+
+            <div>
+              <BackButton />
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-3">

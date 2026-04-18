@@ -6,6 +6,7 @@ import { AdminLoginPage } from "../pages/admin/AdminLoginPage";
 import { AdminDashboardPage } from "../pages/admin/AdminDashboardPage";
 import { AdminLinksPage } from "../pages/admin/AdminLinksPage";
 import { AdminSessionsPage } from "../pages/admin/AdminSessionsPage";
+import { AdminSessionDetailPage } from "../pages/admin/AdminSessionDetailPage";
 import { RequireAdminAuth } from "../features/admin-auth/RequireAdminAuth";
 
 function HomePage() {
@@ -35,14 +36,6 @@ function HomePage() {
 
 function SuperAdminLoginPage() {
   return <div className="p-8">Super Admin Login Page</div>;
-}
-
-function AdminSessionDetailStub() {
-  return (
-    <div className="text-slate-700">
-      Следующий шаг: детальная карточка прохождения.
-    </div>
-  );
 }
 
 export function AppRouter() {
@@ -83,7 +76,7 @@ export function AppRouter() {
         path="/admin/sessions/:id"
         element={
           <RequireAdminAuth>
-            {() => <AdminSessionDetailStub />}
+            {(admin) => <AdminSessionDetailPage admin={admin} />}
           </RequireAdminAuth>
         }
       />

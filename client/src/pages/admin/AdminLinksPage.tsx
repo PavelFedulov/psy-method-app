@@ -8,6 +8,7 @@ import {
 } from "../../api/admin-links";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
+import { BackButton } from "../../components/ui/BackButton";
 import { Loader } from "../../components/ui/Loader";
 import type { AdminUser } from "../../features/admin-auth/admin-auth.types";
 
@@ -168,13 +169,16 @@ export function AdminLinksPage({ admin }: Props) {
             </p>
           </div>
 
-          <Button
-            type="button"
-            onClick={handleCreateLink}
-            disabled={isCreating}
-          >
-            {isCreating ? "Создание..." : "Создать ссылку"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <BackButton />
+            <Button
+              type="button"
+              onClick={handleCreateLink}
+              disabled={isCreating}
+            >
+              {isCreating ? "Создание..." : "Создать ссылку"}
+            </Button>
+          </div>
         </div>
 
         {actionError ? (
