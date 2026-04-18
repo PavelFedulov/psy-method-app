@@ -4,6 +4,7 @@ import { PublicEntryPage } from "../pages/public/PublicEntryPage";
 import { PublicStepPage } from "../pages/public/PublicStepPage";
 import { AdminLoginPage } from "../pages/admin/AdminLoginPage";
 import { AdminDashboardPage } from "../pages/admin/AdminDashboardPage";
+import { AdminLinksPage } from "../pages/admin/AdminLinksPage";
 import { RequireAdminAuth } from "../features/admin-auth/RequireAdminAuth";
 
 function HomePage() {
@@ -41,11 +42,21 @@ export function AppRouter() {
       <Route path="/" element={<HomePage />} />
 
       <Route path="/admin/login" element={<AdminLoginPage />} />
+
       <Route
         path="/admin"
         element={
           <RequireAdminAuth>
             {(admin) => <AdminDashboardPage admin={admin} />}
+          </RequireAdminAuth>
+        }
+      />
+
+      <Route
+        path="/admin/links"
+        element={
+          <RequireAdminAuth>
+            {(admin) => <AdminLinksPage admin={admin} />}
           </RequireAdminAuth>
         }
       />
