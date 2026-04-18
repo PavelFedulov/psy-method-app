@@ -30,10 +30,15 @@ export function AdminDashboardPage({ admin }: Props) {
             </p>
           </Link>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-400">
-            <div className="text-lg font-semibold">Прохождения</div>
-            <p className="mt-2 text-sm">Следующий шаг: список результатов и детальная карточка.</p>
-          </div>
+          <Link
+            to="/admin/sessions"
+            className="rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-slate-100"
+          >
+            <div className="text-lg font-semibold text-slate-900">Прохождения</div>
+            <p className="mt-2 text-sm text-slate-600">
+              Просмотр результатов, удаление и экспорт.
+            </p>
+          </Link>
         </div>
       </Card>
     </div>
