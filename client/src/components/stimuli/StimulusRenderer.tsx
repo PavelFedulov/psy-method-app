@@ -2,6 +2,13 @@ import { StimulusStage } from "./shared/StimulusStage";
 import { EbbinghausStimulus } from "./svg/EbbinghausStimulus";
 import { DumbbellStimulus } from "./svg/DumbbellStimulus";
 import { MullerLyerStimulus } from "./svg/MullerLyerStimulus";
+import { CupStimulus } from "./svg/CupStimulus";
+import { PerspectiveLinesStimulus } from "./svg/PerspectiveLinesStimulus";
+import { TrapezoidStimulus } from "./svg/TrapezoidStimulus";
+import { CorridorStimulus } from "./svg/CorridorStimulus";
+import { SquareContrastStimulus } from "./svg/SquareContrastStimulus";
+import { ConcentricCirclesStimulus } from "./svg/ConcentricCirclesStimulus";
+import { CircleContextStimulus } from "./svg/CircleContextStimulus";
 import { FallbackStimulus } from "./svg/FallbackStimulus";
 
 type Props = {
@@ -10,10 +17,6 @@ type Props = {
   referenceValue: number;
   currentValue: number;
 };
-
-function isSingleStageStimulus(stimulusType: string) {
-  return stimulusType === "dumbbell" || stimulusType === "muller-lyer";
-}
 
 export function StimulusRenderer({
   stimulusType,
@@ -61,11 +64,92 @@ export function StimulusRenderer({
     );
   }
 
-  if (isSingleStageStimulus(stimulusType)) {
+  if (stimulusType === "cup") {
     return (
       <div className="mx-auto max-w-4xl">
         <StimulusStage label="Стимулы">
-          <FallbackStimulus title={stimulusLabel} />
+          <CupStimulus
+            referenceValue={referenceValue}
+            currentValue={currentValue}
+          />
+        </StimulusStage>
+      </div>
+    );
+  }
+
+  if (stimulusType === "perspective-lines") {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <StimulusStage label="Стимулы">
+          <PerspectiveLinesStimulus
+            referenceValue={referenceValue}
+            currentValue={currentValue}
+          />
+        </StimulusStage>
+      </div>
+    );
+  }
+
+  if (stimulusType === "trapezoid") {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <StimulusStage label="Стимулы">
+          <TrapezoidStimulus
+            referenceValue={referenceValue}
+            currentValue={currentValue}
+          />
+        </StimulusStage>
+      </div>
+    );
+  }
+
+  if (stimulusType === "corridor") {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <StimulusStage label="Стимулы">
+          <CorridorStimulus
+            referenceValue={referenceValue}
+            currentValue={currentValue}
+          />
+        </StimulusStage>
+      </div>
+    );
+  }
+
+  if (stimulusType === "square-contrast") {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <StimulusStage label="Стимулы">
+          <SquareContrastStimulus
+            referenceValue={referenceValue}
+            currentValue={currentValue}
+          />
+        </StimulusStage>
+      </div>
+    );
+  }
+
+  if (stimulusType === "concentric-circles") {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <StimulusStage label="Стимулы">
+          <ConcentricCirclesStimulus
+            referenceValue={referenceValue}
+            currentValue={currentValue}
+          />
+        </StimulusStage>
+      </div>
+    );
+  }
+
+  if (stimulusType === "circle-context") {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <StimulusStage label="Стимулы">
+          <CircleContextStimulus
+            referenceValue={referenceValue}
+            currentValue={currentValue}
+          />
         </StimulusStage>
       </div>
     );

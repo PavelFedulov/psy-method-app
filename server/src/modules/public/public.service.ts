@@ -386,6 +386,19 @@ export function submitPublicStep(
     throw new Error("Конфиг шага не найден");
   }
 
+  const minAllowedValue = Math.max(1, stimulus.referenceValue - 20);
+
+  const maxAllowedValue = stimulus.referenceValue + 20;
+
+  if (
+    parsed.finalValue < minAllowedValue ||
+    parsed.finalValue > maxAllowedValue
+  ) {
+    throw new Error(
+      `Значение должно быть в диапазоне от ${minAllowedValue} до ${maxAllowedValue}`,
+    );
+  }
+
   const existingStep = db
     .prepare(
       `

@@ -8,7 +8,6 @@ import {
 import { StimulusRenderer } from "../../components/stimuli/StimulusRenderer";
 import { Card } from "../../components/ui/Card";
 import { Loader } from "../../components/ui/Loader";
-import { getStimulusUiLimits } from "../../config/stimuli-ui.config";
 import { StepControls } from "../../features/public-flow/StepControls";
 import {
   clampValue,
@@ -17,6 +16,13 @@ import {
 } from "../../features/public-flow/public-flow.utils";
 import type { PublicStepResponse } from "../../features/public-flow/public-flow.types";
 import { PublicStatePage } from "./PublicStatePage";
+
+function getDynamicBounds(referenceValue: number) {
+  return {
+    minValue: Math.max(1, referenceValue - 20),
+    maxValue: referenceValue + 20,
+  };
+}
 
 export function PublicStepPage() {
   const { token = "", stepNumber = "" } = useParams();
@@ -111,10 +117,10 @@ export function PublicStepPage() {
       return;
     }
 
-    const { maxValue } = getStimulusUiLimits(stepData.stimulus.stimulusType);
+    const { maxValue } = getDynamicBounds(stepData.stimulus.referenceValue);
 
     setCurrentValue((prev) =>
-      clampValue(prev + stepData.stimulus.stepSize, 0, maxValue),
+      clampValue(prev + stepData.stimulus.stepSize, 1, maxValue),
     );
     setClicksMore((prev) => prev + 1);
   }
@@ -124,10 +130,10 @@ export function PublicStepPage() {
       return;
     }
 
-    const { minValue } = getStimulusUiLimits(stepData.stimulus.stimulusType);
+    const { minValue } = getDynamicBounds(stepData.stimulus.referenceValue);
 
     setCurrentValue((prev) =>
-      clampValue(prev - stepData.stimulus.stepSize, minValue, 1000),
+      clampValue(prev - stepData.stimulus.stepSize, minValue, 10000),
     );
     setClicksLess((prev) => prev + 1);
   }
