@@ -5,9 +5,10 @@ import {
   getPublicStep,
   submitPublicStep,
 } from "../../api/public";
-import { StimulusPreview } from "../../components/stimuli/StimulusPreview";
+import { StimulusRenderer } from "../../components/stimuli/StimulusRenderer";
 import { Card } from "../../components/ui/Card";
 import { Loader } from "../../components/ui/Loader";
+import { getStimulusUiLimits } from "../../config/stimuli-ui.config";
 import { StepControls } from "../../features/public-flow/StepControls";
 import {
   clampValue,
@@ -16,9 +17,6 @@ import {
 } from "../../features/public-flow/public-flow.utils";
 import type { PublicStepResponse } from "../../features/public-flow/public-flow.types";
 import { PublicStatePage } from "./PublicStatePage";
-
-const MIN_VALUE = 0;
-const MAX_VALUE = 500;
 
 export function PublicStepPage() {
   const { token = "", stepNumber = "" } = useParams();
@@ -113,8 +111,10 @@ export function PublicStepPage() {
       return;
     }
 
+    const { maxValue } = getStimulusUiLimits(stepData.stimulus.stimulusType);
+
     setCurrentValue((prev) =>
-      clampValue(prev + stepData.stimulus.stepSize, MIN_VALUE, MAX_VALUE),
+      clampValue(prev + stepData.stimulus.stepSize, 0, maxValue),
     );
     setClicksMore((prev) => prev + 1);
   }
@@ -124,8 +124,10 @@ export function PublicStepPage() {
       return;
     }
 
+    const { minValue } = getStimulusUiLimits(stepData.stimulus.stimulusType);
+
     setCurrentValue((prev) =>
-      clampValue(prev - stepData.stimulus.stepSize, MIN_VALUE, MAX_VALUE),
+      clampValue(prev - stepData.stimulus.stepSize, minValue, 1000),
     );
     setClicksLess((prev) => prev + 1);
   }
@@ -191,6 +193,7 @@ export function PublicStepPage() {
         <h1 className="mt-2 text-2xl font-bold text-slate-900">
           {stepData.stimulus.stimulusLabel}
         </h1>
+
         <div className="mx-auto mt-4 max-w-2xl rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
           <p className="font-medium text-slate-900">Измените:</p>
           <p className="mt-1">
@@ -202,9 +205,9 @@ export function PublicStepPage() {
       <Card>
         <div className="space-y-8">
           <div className="mx-auto max-w-5xl">
-            <StimulusPreview
-              title={stepData.stimulus.stimulusLabel}
-              adjustablePartLabel={stepData.stimulus.adjustablePartLabel}
+            <StimulusRenderer
+              stimulusType={stepData.stimulus.stimulusType}
+              stimulusLabel={stepData.stimulus.stimulusLabel}
               referenceValue={stepData.stimulus.referenceValue}
               currentValue={currentValue}
             />
