@@ -12,27 +12,35 @@ export function StimulusPreview({
   currentValue,
 }: Props) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-        <p className="mb-3 text-sm font-medium text-slate-500">Эталон</p>
-        <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white">
+    <div className="grid gap-6 md:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 md:p-8">
+        <p className="mb-4 text-center text-sm font-medium uppercase tracking-wide text-slate-500">
+          Эталон
+        </p>
+
+        <div className="flex min-h-[300px] items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200 md:min-h-[380px]">
           <div className="text-center">
-            <p className="text-base font-semibold text-slate-900">{title}</p>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="text-lg font-semibold text-slate-900 md:text-xl">
+              {title}
+            </p>
+            <p className="mt-4 text-base text-slate-600 md:text-lg">
               {adjustablePartLabel}: <strong>{referenceValue}</strong>
             </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-        <p className="mb-3 text-sm font-medium text-slate-500">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 md:p-8">
+        <p className="mb-4 text-center text-sm font-medium uppercase tracking-wide text-slate-500">
           Регулируемая фигура
         </p>
-        <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white">
+
+        <div className="flex min-h-[300px] items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200 md:min-h-[380px]">
           <div className="text-center">
-            <p className="text-base font-semibold text-slate-900">{title}</p>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="text-lg font-semibold text-slate-900 md:text-xl">
+              {title}
+            </p>
+            <p className="mt-4 text-base text-slate-600 md:text-lg">
               {adjustablePartLabel}: <strong>{currentValue}</strong>
             </p>
           </div>
