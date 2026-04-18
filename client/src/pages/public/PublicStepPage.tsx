@@ -168,7 +168,7 @@ export function PublicStepPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-10">
         <Loader />
       </div>
     );
@@ -185,13 +185,13 @@ export function PublicStepPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-6">
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mb-6 text-center">
         <p className="text-sm font-medium text-slate-500">{stepLabel}</p>
         <h1 className="mt-2 text-2xl font-bold text-slate-900">
           {stepData.stimulus.stimulusLabel}
         </h1>
-        <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+        <div className="mx-auto mt-4 max-w-2xl rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
           <p className="font-medium text-slate-900">Измените:</p>
           <p className="mt-1">
             • <strong>{stepData.stimulus.adjustablePartLabel}</strong>
@@ -199,35 +199,29 @@ export function PublicStepPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <Card>
-          <StimulusPreview
-            title={stepData.stimulus.stimulusLabel}
-            adjustablePartLabel={stepData.stimulus.adjustablePartLabel}
-            referenceValue={stepData.stimulus.referenceValue}
-            currentValue={currentValue}
-          />
-        </Card>
+      <Card>
+        <div className="space-y-8">
+          <div className="mx-auto max-w-5xl">
+            <StimulusPreview
+              title={stepData.stimulus.stimulusLabel}
+              adjustablePartLabel={stepData.stimulus.adjustablePartLabel}
+              referenceValue={stepData.stimulus.referenceValue}
+              currentValue={currentValue}
+            />
+          </div>
 
-        <Card>
           <StepControls
-            currentValue={currentValue}
             onIncrease={handleIncrease}
             onDecrease={handleDecrease}
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}
           />
 
-          <div className="mt-6 space-y-2 text-sm text-slate-600">
-            <p>Нажатий «больше»: {clicksMore}</p>
-            <p>Нажатий «меньше»: {clicksLess}</p>
-          </div>
-
           {pageError ? (
-            <div className="mt-4 text-sm text-red-600">{pageError}</div>
+            <div className="text-center text-sm text-red-600">{pageError}</div>
           ) : null}
-        </Card>
-      </div>
+        </div>
+      </Card>
     </div>
   );
 }
