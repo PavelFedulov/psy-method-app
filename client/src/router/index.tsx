@@ -1,4 +1,7 @@
 import { Routes, Route, Link } from "react-router-dom";
+import { PublicCompletedPage } from "../pages/public/PublicCompletedPage";
+import { PublicEntryPage } from "../pages/public/PublicEntryPage";
+import { PublicStepPage } from "../pages/public/PublicStepPage";
 
 function HomePage() {
   return (
@@ -33,17 +36,16 @@ function SuperAdminLoginPage() {
   return <div className="p-8">Super Admin Login Page</div>;
 }
 
-function ParticipantEntryPage() {
-  return <div className="p-8">Participant Public Flow</div>;
-}
-
 export function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/super-admin/login" element={<SuperAdminLoginPage />} />
-      <Route path="/r/:token" element={<ParticipantEntryPage />} />
+
+      <Route path="/r/:token" element={<PublicEntryPage />} />
+      <Route path="/r/:token/steps/:stepNumber" element={<PublicStepPage />} />
+      <Route path="/r/:token/completed" element={<PublicCompletedPage />} />
     </Routes>
   );
 }
