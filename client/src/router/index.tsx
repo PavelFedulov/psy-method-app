@@ -11,6 +11,7 @@ import { RequireAdminAuth } from "../features/admin-auth/RequireAdminAuth";
 import { SuperAdminLoginPage } from "../pages/super-admin/SuperAdminLoginPage";
 import { SuperAdminDashboardPage } from "../pages/super-admin/SuperAdminDashboardPage";
 import { RequireSuperAdminAuth } from "../features/super-admin-auth/RequireSuperAdminAuth";
+import { SuperAdminAdminsPage } from "../pages/super-admin/SuperAdminAdminsPage";
 
 function HomePage() {
   return (
@@ -89,6 +90,15 @@ export function AppRouter() {
             {(superAdmin) => (
               <SuperAdminDashboardPage superAdmin={superAdmin} />
             )}
+          </RequireSuperAdminAuth>
+        }
+      />
+
+      <Route
+        path="/super-admin/admins"
+        element={
+          <RequireSuperAdminAuth>
+            {(superAdmin) => <SuperAdminAdminsPage superAdmin={superAdmin} />}
           </RequireSuperAdminAuth>
         }
       />
