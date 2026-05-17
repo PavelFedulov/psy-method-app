@@ -8,6 +8,9 @@ import { AdminLinksPage } from "../pages/admin/AdminLinksPage";
 import { AdminSessionsPage } from "../pages/admin/AdminSessionsPage";
 import { AdminSessionDetailPage } from "../pages/admin/AdminSessionDetailPage";
 import { RequireAdminAuth } from "../features/admin-auth/RequireAdminAuth";
+import { SuperAdminLoginPage } from "../pages/super-admin/SuperAdminLoginPage";
+import { SuperAdminDashboardPage } from "../pages/super-admin/SuperAdminDashboardPage";
+import { RequireSuperAdminAuth } from "../features/super-admin-auth/RequireSuperAdminAuth";
 
 function HomePage() {
   return (
@@ -32,10 +35,6 @@ function HomePage() {
       </div>
     </div>
   );
-}
-
-function SuperAdminLoginPage() {
-  return <div className="p-8">Super Admin Login Page</div>;
 }
 
 export function AppRouter() {
@@ -82,6 +81,17 @@ export function AppRouter() {
       />
 
       <Route path="/super-admin/login" element={<SuperAdminLoginPage />} />
+
+      <Route
+        path="/super-admin"
+        element={
+          <RequireSuperAdminAuth>
+            {(superAdmin) => (
+              <SuperAdminDashboardPage superAdmin={superAdmin} />
+            )}
+          </RequireSuperAdminAuth>
+        }
+      />
 
       <Route path="/r/:token" element={<PublicEntryPage />} />
       <Route path="/r/:token/steps/:stepNumber" element={<PublicStepPage />} />
