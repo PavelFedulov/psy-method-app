@@ -21,6 +21,8 @@ type ParticipantSessionRow = {
   id: number;
   link_id: number;
   participant_code: string;
+  age: number;
+  gender: string;
   current_step: number;
   status: string;
   started_at: string;
@@ -111,6 +113,8 @@ export function getPublicLinkState(db: Database.Database, token: string) {
 
 type StartPublicSessionInput = {
   participantCode: string;
+  age: number;
+  gender: "male" | "female";
   consentAccepted: boolean;
 };
 
@@ -119,10 +123,22 @@ export function startPublicSession(
   token: string,
   input: StartPublicSessionInput,
 ) {
-  const participantCode = input.participantCode.trim();
+  const participantCode = String(input.participantCode ?? "").trim();
+
+  const age = Number(input.age);
+
+  const gender = String(input.gender ?? "").trim();
 
   if (!participantCode) {
     throw new Error("Participant ID обязателен");
+  }
+
+  if (!Number.isInteger(age) || age < 18) {
+    throw new Error("Возраст должен быть не меньше 18 лет");
+  }
+
+  if (!["male", "female"].includes(gender)) {
+    throw new Error("Нужно выбрать пол");
   }
 
   if (!input.consentAccepted) {
@@ -185,6 +201,8 @@ export function startPublicSession(
         INSERT INTO participant_sessions (
           link_id,
           participant_code,
+          age,
+          gender,
           consent_accepted,
           current_step,
           status,
@@ -192,12 +210,14 @@ export function startPublicSession(
           last_activity_at,
           completed_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         `,
       )
       .run(
         link.id,
         participantCode,
+        age,
+        gender,
         1,
         1,
         SESSION_STATUS.IN_PROGRESS,

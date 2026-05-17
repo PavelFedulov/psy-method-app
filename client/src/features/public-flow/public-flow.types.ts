@@ -24,6 +24,8 @@ export type PublicLinkStateResponse =
 
 export type StartPublicSessionRequest = {
   participantCode: string;
+  age: number;
+  gender: "male" | "female";
   consentAccepted: boolean;
 };
 

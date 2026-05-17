@@ -59,6 +59,8 @@ export function PublicEntryPage() {
 
   async function handleStart(payload: {
     participantCode: string;
+    age: number;
+    gender: "male" | "female";
     consentAccepted: boolean;
   }) {
     try {

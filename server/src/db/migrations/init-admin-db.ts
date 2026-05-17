@@ -16,6 +16,8 @@ export function initAdminDb(db: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       link_id INTEGER NOT NULL,
       participant_code TEXT NOT NULL UNIQUE,
+      age INTEGER NOT NULL,
+      gender TEXT NOT NULL,
       consent_accepted INTEGER NOT NULL,
       current_step INTEGER NOT NULL DEFAULT 1,
       status TEXT NOT NULL,

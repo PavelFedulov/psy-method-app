@@ -1,6 +1,6 @@
-import type Database from 'better-sqlite3';
-import { LINK_STATUS } from '../../constants/app.constants';
-import { formatDurationMmSs } from '../../utils/format-duration';
+import type Database from "better-sqlite3";
+import { LINK_STATUS } from "../../constants/app.constants";
+import { formatDurationMmSs } from "../../utils/format-duration";
 
 type SessionListRow = {
   id: number;
@@ -37,6 +37,8 @@ export function getAdminSessionsList(db: Database.Database) {
       SELECT
         s.id,
         s.participant_code,
+        s.age,
+        s.gender,
         s.current_step,
         s.status,
         s.started_at,
@@ -54,6 +56,8 @@ export function getAdminSessionsList(db: Database.Database) {
   return rows.map((row) => ({
     id: row.id,
     participantCode: row.participant_code,
+    age: row.age,
+    gender: row.gender,
     currentStep: row.current_step,
     status: row.status,
     startedAt: row.started_at,
@@ -64,7 +68,10 @@ export function getAdminSessionsList(db: Database.Database) {
   }));
 }
 
-export function getAdminSessionDetail(db: Database.Database, sessionId: number) {
+export function getAdminSessionDetail(
+  db: Database.Database,
+  sessionId: number,
+) {
   const session = db
     .prepare(
       `
@@ -108,7 +115,7 @@ export function getAdminSessionDetail(db: Database.Database, sessionId: number) 
     | undefined;
 
   if (!session) {
-    throw new Error('Прохождение не найдено');
+    throw new Error("Прохождение не найдено");
   }
 
   const steps = db
@@ -135,7 +142,10 @@ export function getAdminSessionDetail(db: Database.Database, sessionId: number) 
     )
     .all(sessionId) as SessionStepRow[];
 
-  const totalTimeSeconds = steps.reduce((sum, step) => sum + step.time_spent_seconds, 0);
+  const totalTimeSeconds = steps.reduce(
+    (sum, step) => sum + step.time_spent_seconds,
+    0,
+  );
   const totalClicks = steps.reduce((sum, step) => sum + step.clicks_total, 0);
 
   return {
@@ -197,7 +207,7 @@ export function deleteAdminSession(db: Database.Database, sessionId: number) {
     | undefined;
 
   if (!session) {
-    throw new Error('Прохождение не найдено');
+    throw new Error("Прохождение не найдено");
   }
 
   const transaction = db.transaction(() => {
@@ -233,9 +243,12 @@ export function deleteAdminSession(db: Database.Database, sessionId: number) {
   return { ok: true };
 }
 
-export function bulkDeleteAdminSessions(db: Database.Database, sessionIds: number[]) {
+export function bulkDeleteAdminSessions(
+  db: Database.Database,
+  sessionIds: number[],
+) {
   if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
-    throw new Error('Нужно передать хотя бы один session id');
+    throw new Error("Нужно передать хотя бы один session id");
   }
 
   const normalizedIds = sessionIds
@@ -243,7 +256,7 @@ export function bulkDeleteAdminSessions(db: Database.Database, sessionIds: numbe
     .filter((id) => Number.isInteger(id) && id > 0);
 
   if (normalizedIds.length === 0) {
-    throw new Error('Некорректный список session id');
+    throw new Error("Некорректный список session id");
   }
 
   const transaction = db.transaction(() => {
