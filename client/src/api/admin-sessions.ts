@@ -3,6 +3,8 @@ import { http } from "./http";
 export type AdminSession = {
   id: number;
   participantCode: string;
+  age: number | null;
+  gender: string | null;
   currentStep: number;
   status: "in_progress" | "completed" | string;
   startedAt: string;
@@ -20,6 +22,8 @@ export type AdminSessionDetailResponse = {
   session: {
     id: number;
     participantCode: string;
+    age: number | null;
+    gender: string | null;
     currentStep: number;
     status: string;
     startedAt: string;

@@ -6,6 +6,8 @@ import { formatDurationMmSs } from "../../utils/format-duration";
 type ExportRow = {
   session_id: number;
   participant_code: string;
+  age: number | null;
+  gender: string | null;
   session_status: string;
   session_started_at: string;
   session_completed_at: string | null;
@@ -35,6 +37,8 @@ type ExportInput = {
 type FlatExportRow = {
   sessionId: number;
   participantCode: string;
+  age: number | null;
+  gender: string;
   sessionStatus: string;
   sessionStartedAt: string;
   sessionCompletedAt: string | null;
@@ -65,6 +69,17 @@ function normalizeSessionIds(sessionIds?: number[]): number[] {
   return sessionIds
     .map((id) => Number(id))
     .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function mapGender(gender: string | null): string {
+  switch (gender) {
+    case "male":
+      return "Мужской";
+    case "female":
+      return "Женский";
+    default:
+      return "";
+  }
 }
 
 function resolveSessionIds(
@@ -169,6 +184,8 @@ function buildExportRows(
   return rows.map((row) => ({
     sessionId: row.session_id,
     participantCode: row.participant_code,
+    age: row.age,
+    gender: mapGender(row.gender),
     sessionStatus: mapSessionStatus(row.session_status),
     sessionStartedAt: row.session_started_at,
     sessionCompletedAt: row.session_completed_at,
@@ -200,6 +217,8 @@ export function exportSessionsToCsv(db: Database.Database, input: ExportInput) {
     columns: [
       { key: "sessionId", header: "ID прохождения" },
       { key: "participantCode", header: "Participant ID" },
+      { key: "age", header: "Возраст" },
+      { key: "gender", header: "Пол" },
       { key: "sessionStatus", header: "Статус прохождения" },
       { key: "sessionStartedAt", header: "Начало прохождения" },
       { key: "sessionCompletedAt", header: "Завершение прохождения" },
@@ -238,6 +257,8 @@ export async function exportSessionsToXlsx(
   worksheet.columns = [
     { header: "ID прохождения", key: "sessionId", width: 16 },
     { header: "Participant ID", key: "participantCode", width: 18 },
+    { header: "Возраст", key: "age", width: 12 },
+    { header: "Пол", key: "gender", width: 14 },
     { header: "Статус прохождения", key: "sessionStatus", width: 20 },
     { header: "Начало прохождения", key: "sessionStartedAt", width: 24 },
     { header: "Завершение прохождения", key: "sessionCompletedAt", width: 24 },
