@@ -1,4 +1,9 @@
-const API_BASE_URL = "http://localhost:3001";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
+
+export function getApiUrl(path: string) {
+  return `${API_BASE_URL}${path}`;
+}
 
 type RequestOptions = RequestInit & {
   json?: unknown;
@@ -10,7 +15,7 @@ export async function http<T>(
 ): Promise<T> {
   const { json, headers, ...rest } = options;
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(getApiUrl(path), {
     ...rest,
     credentials: "include",
     headers: {
@@ -22,7 +27,19 @@ export async function http<T>(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || "Request failed");
+    let errorMessage = "";
+
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown };
+
+      if (typeof parsed.error === "string") {
+        errorMessage = parsed.error;
+      }
+    } catch {
+      // Fall back to the raw response text below.
+    }
+
+    throw new Error(errorMessage || text || "Request failed");
   }
 
   return response.json() as Promise<T>;

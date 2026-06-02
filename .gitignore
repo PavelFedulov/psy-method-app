@@ -17,7 +17,11 @@ server/dist
 
 # db
 server/data/*.sqlite
+server/data/*.sqlite-shm
+server/data/*.sqlite-wal
 server/data/admin-dbs/*.sqlite
+server/data/admin-dbs/*.sqlite-shm
+server/data/admin-dbs/*.sqlite-wal
 
 # system
 .DS_Store

@@ -153,6 +153,8 @@ function buildExportRows(
       SELECT
         s.id AS session_id,
         s.participant_code,
+        s.age,
+        s.gender,
         s.status AS session_status,
         s.started_at AS session_started_at,
         s.completed_at AS session_completed_at,
