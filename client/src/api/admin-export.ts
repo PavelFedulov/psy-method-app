@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:3001";
+import { getApiUrl } from "./http";
 
 type ExportPayload = {
   sessionIds?: number[];
@@ -10,7 +10,7 @@ async function downloadFile(
   payload: ExportPayload,
   fallbackFileName: string,
 ) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(getApiUrl(path), {
     method: "POST",
     credentials: "include",
     headers: {
@@ -21,7 +21,19 @@ async function downloadFile(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || "Не удалось выполнить экспорт");
+    let errorMessage = "";
+
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown };
+
+      if (typeof parsed.error === "string") {
+        errorMessage = parsed.error;
+      }
+    } catch {
+      // Fall back to the raw response text below.
+    }
+
+    throw new Error(errorMessage || text || "Не удалось выполнить экспорт");
   }
 
   const blob = await response.blob();

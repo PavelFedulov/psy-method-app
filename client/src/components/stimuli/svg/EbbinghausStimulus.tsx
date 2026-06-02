@@ -4,7 +4,6 @@ type Props = {
 
 const STROKE = "#2f2f2f";
 const FILL = "#ffffff";
-const DARK_FILL = "#2f2f2f";
 
 export function EbbinghausStimulus({ value }: Props) {
   const centerRadius = value / 2;

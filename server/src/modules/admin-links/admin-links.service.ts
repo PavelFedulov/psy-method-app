@@ -26,49 +26,61 @@ export function createParticipantLink(params: CreateParticipantLinkParams) {
   const token = generateParticipantToken();
   const createdAt = nowIso();
 
-  const transaction = db.transaction(() => {
-    const result = db
-      .prepare(
-        `
-        INSERT INTO participant_links (
-          token,
-          status,
-          created_at,
-          started_at,
-          completed_at,
-          revoked_at
-        )
-        VALUES (?, ?, ?, NULL, NULL, NULL)
-        `,
+  coreDb
+    .prepare(
+      `
+      INSERT INTO participant_link_index (
+        admin_id,
+        db_file_name,
+        token,
+        created_at
       )
-      .run(token, LINK_STATUS.NEW, createdAt);
+      VALUES (?, ?, ?, ?)
+      `,
+    )
+    .run(adminId, dbFileName, token, createdAt);
 
+  try {
+    const transaction = db.transaction(() => {
+      const result = db
+        .prepare(
+          `
+          INSERT INTO participant_links (
+            token,
+            status,
+            created_at,
+            started_at,
+            completed_at,
+            revoked_at
+          )
+          VALUES (?, ?, ?, NULL, NULL, NULL)
+          `,
+        )
+        .run(token, LINK_STATUS.NEW, createdAt);
+
+      return {
+        id: Number(result.lastInsertRowid),
+        token,
+        status: LINK_STATUS.NEW,
+        createdAt,
+        startedAt: null,
+        completedAt: null,
+        revokedAt: null,
+      };
+    });
+
+    return transaction();
+  } catch (error) {
     coreDb
       .prepare(
         `
-        INSERT INTO participant_link_index (
-          admin_id,
-          db_file_name,
-          token,
-          created_at
-        )
-        VALUES (?, ?, ?, ?)
+        DELETE FROM participant_link_index
+        WHERE token = ?
         `,
       )
-      .run(adminId, dbFileName, token, createdAt);
-
-    return {
-      id: Number(result.lastInsertRowid),
-      token,
-      status: LINK_STATUS.NEW,
-      createdAt,
-      startedAt: null,
-      completedAt: null,
-      revokedAt: null,
-    };
-  });
-
-  return transaction();
+      .run(token);
+    throw error;
+  }
 }
 
 export function getParticipantLinks(db: Database.Database) {

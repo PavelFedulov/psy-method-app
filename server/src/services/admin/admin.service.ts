@@ -1,3 +1,4 @@
+import type Database from "better-sqlite3";
 import { z } from "zod";
 import { coreDb } from "../../db/core/core-db";
 import { getAdminDbByFileName } from "../../db/factories/admin-db-factory";
@@ -9,7 +10,11 @@ const createAdminSchema = z.object({
   username: z
     .string()
     .min(3, "Логин должен содержать минимум 3 символа")
-    .max(50, "Логин слишком длинный"),
+    .max(50, "Логин слишком длинный")
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      "Логин может содержать только латинские буквы, цифры, _ и -",
+    ),
   password: z
     .string()
     .min(6, "Пароль должен содержать минимум 6 символов")
@@ -36,6 +41,7 @@ export async function createAdmin(input: CreateAdminInput) {
   }
 
   const passwordHash = await hashPassword(validated.password);
+  const dbFileName = `admin_${validated.username}.sqlite`;
 
   const insertResult = coreDb
     .prepare(
@@ -47,16 +53,22 @@ export async function createAdmin(input: CreateAdminInput) {
     .run(
       validated.username,
       passwordHash,
-      `admin_${validated.username}.sqlite`,
+      dbFileName,
       nowIso(),
-    );
+  );
 
   const adminId = Number(insertResult.lastInsertRowid);
-  const dbFileName = `admin_${validated.username}.sqlite`;
+  let adminDb: Database.Database | undefined;
 
-  const adminDb = getAdminDbByFileName(dbFileName);
-  initAdminDb(adminDb);
-  adminDb.close();
+  try {
+    adminDb = getAdminDbByFileName(dbFileName);
+    initAdminDb(adminDb);
+  } catch (error) {
+    coreDb.prepare("DELETE FROM admins WHERE id = ?").run(adminId);
+    throw error;
+  } finally {
+    adminDb?.close();
+  }
 
   return {
     id: adminId,
