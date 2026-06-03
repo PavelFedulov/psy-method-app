@@ -1,9 +1,16 @@
 import { createApp } from "./app";
 import { env } from "./config/env";
 import { initCoreDb } from "./db/migrations/init-core-db";
+import { ensureSuperAdmin } from "./services/bootstrap/super-admin-bootstrap.service";
 
 async function bootstrap() {
   await initCoreDb();
+  const superAdminCreated = await ensureSuperAdmin();
+
+  if (superAdminCreated) {
+    console.log("Super admin created");
+  }
+
   const app = createApp();
 
   app.listen(env.port, () => {

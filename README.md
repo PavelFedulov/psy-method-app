@@ -21,8 +21,6 @@ npm run dev
 cd server
 npm install
 cp .env.example .env
-npm run db:init
-npm run seed:super-admin
 npm run dev
 
 ## Deploy
@@ -32,7 +30,7 @@ Recommended setup: deploy as one Node.js web service with a managed PostgreSQL d
 Build command:
 
 ```sh
-npm ci && npm --prefix client ci && npm --prefix server ci && npm run build
+npm ci --include=dev && npm --prefix client ci --include=dev && npm --prefix server ci --include=dev && npm run build
 ```
 
 Start command:
@@ -53,9 +51,4 @@ SUPER_ADMIN_USERNAME=admin
 SUPER_ADMIN_PASSWORD=replace-with-a-strong-password
 ```
 
-On the first deploy, initialize the database and run the seed command once:
-
-```sh
-npm --prefix server run db:init
-npm --prefix server run seed:super-admin
-```
+The server initializes database tables and creates the initial super admin automatically on startup if they do not exist.
