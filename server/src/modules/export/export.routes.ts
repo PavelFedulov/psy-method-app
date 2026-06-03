@@ -1,20 +1,18 @@
 import { Router } from "express";
 import { requireAdminAuth } from "../../middlewares/require-admin-auth";
-import { attachAdminDb } from "../../middlewares/attach-admin-db";
 import { exportSessionsToCsv, exportSessionsToXlsx } from "./export.service";
 
 const router = Router();
 
 router.use(requireAdminAuth);
-router.use(attachAdminDb);
 
-router.post("/csv", (req, res, next) => {
+router.post("/csv", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const fileBuffer = exportSessionsToCsv(req.adminDb, req.body);
+    const fileBuffer = await exportSessionsToCsv(req.admin.id, req.body);
     const timestamp = new Date()
       .toISOString()
       .slice(0, 19)
@@ -34,11 +32,11 @@ router.post("/csv", (req, res, next) => {
 
 router.post("/xlsx", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const fileBuffer = await exportSessionsToXlsx(req.adminDb, req.body);
+    const fileBuffer = await exportSessionsToXlsx(req.admin.id, req.body);
     const timestamp = new Date()
       .toISOString()
       .slice(0, 19)

@@ -33,40 +33,48 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-router.post("/logout", (req, res) => {
-  const token = req.cookies[COOKIE_NAMES.ADMIN_SESSION];
+router.post("/logout", async (req, res, next) => {
+  try {
+    const token = req.cookies[COOKIE_NAMES.ADMIN_SESSION];
 
-  if (token) {
-    logoutAdmin(token);
+    if (token) {
+      await logoutAdmin(token);
+    }
+
+    res.clearCookie(COOKIE_NAMES.ADMIN_SESSION);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
   }
-
-  res.clearCookie(COOKIE_NAMES.ADMIN_SESSION);
-  res.json({ ok: true });
 });
 
-router.get("/me", (req, res) => {
-  const token = req.cookies[COOKIE_NAMES.ADMIN_SESSION];
+router.get("/me", async (req, res, next) => {
+  try {
+    const token = req.cookies[COOKIE_NAMES.ADMIN_SESSION];
 
-  if (!token) {
+    if (!token) {
+      return res.json({
+        authenticated: false,
+        admin: null,
+      });
+    }
+
+    const admin = await getAdminBySessionToken(token);
+
+    if (!admin) {
+      return res.json({
+        authenticated: false,
+        admin: null,
+      });
+    }
+
     return res.json({
-      authenticated: false,
-      admin: null,
+      authenticated: true,
+      admin,
     });
+  } catch (error) {
+    next(error);
   }
-
-  const admin = getAdminBySessionToken(token);
-
-  if (!admin) {
-    return res.json({
-      authenticated: false,
-      admin: null,
-    });
-  }
-
-  return res.json({
-    authenticated: true,
-    admin,
-  });
 });
 
 export default router;

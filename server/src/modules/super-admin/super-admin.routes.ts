@@ -40,40 +40,48 @@ router.post("/auth/login", async (req, res, next) => {
   }
 });
 
-router.post("/auth/logout", (req, res) => {
-  const token = req.cookies[COOKIE_NAMES.SUPER_ADMIN_SESSION];
+router.post("/auth/logout", async (req, res, next) => {
+  try {
+    const token = req.cookies[COOKIE_NAMES.SUPER_ADMIN_SESSION];
 
-  if (token) {
-    logoutSuperAdmin(token);
+    if (token) {
+      await logoutSuperAdmin(token);
+    }
+
+    res.clearCookie(COOKIE_NAMES.SUPER_ADMIN_SESSION);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
   }
-
-  res.clearCookie(COOKIE_NAMES.SUPER_ADMIN_SESSION);
-  res.json({ ok: true });
 });
 
-router.get("/auth/me", (req, res) => {
-  const token = req.cookies[COOKIE_NAMES.SUPER_ADMIN_SESSION];
+router.get("/auth/me", async (req, res, next) => {
+  try {
+    const token = req.cookies[COOKIE_NAMES.SUPER_ADMIN_SESSION];
 
-  if (!token) {
+    if (!token) {
+      return res.json({
+        authenticated: false,
+        superAdmin: null,
+      });
+    }
+
+    const superAdmin = await getSuperAdminBySessionToken(token);
+
+    if (!superAdmin) {
+      return res.json({
+        authenticated: false,
+        superAdmin: null,
+      });
+    }
+
     return res.json({
-      authenticated: false,
-      superAdmin: null,
+      authenticated: true,
+      superAdmin,
     });
+  } catch (error) {
+    next(error);
   }
-
-  const superAdmin = getSuperAdminBySessionToken(token);
-
-  if (!superAdmin) {
-    return res.json({
-      authenticated: false,
-      superAdmin: null,
-    });
-  }
-
-  return res.json({
-    authenticated: true,
-    superAdmin,
-  });
 });
 
 router.post("/admins", requireSuperAdminAuth, async (req, res, next) => {
@@ -85,17 +93,21 @@ router.post("/admins", requireSuperAdminAuth, async (req, res, next) => {
   }
 });
 
-router.get("/admins", requireSuperAdminAuth, (_req, res) => {
-  const admins = getAdminsList();
-  res.json({ admins });
+router.get("/admins", requireSuperAdminAuth, async (_req, res, next) => {
+  try {
+    const admins = await getAdminsList();
+    res.json({ admins });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.patch("/admins/:id", requireSuperAdminAuth, (req, res, next) => {
+router.patch("/admins/:id", requireSuperAdminAuth, async (req, res, next) => {
   try {
     const adminId = Number(req.params.id);
     const { isActive } = req.body as { isActive: boolean };
 
-    updateAdminStatus(adminId, isActive);
+    await updateAdminStatus(adminId, isActive);
 
     res.json({ ok: true });
   } catch (error) {
@@ -103,14 +115,13 @@ router.patch("/admins/:id", requireSuperAdminAuth, (req, res, next) => {
   }
 });
 
-router.delete("/admins/:id", requireSuperAdminAuth, (req, res, next) => {
+router.delete("/admins/:id", requireSuperAdminAuth, async (req, res, next) => {
   try {
     const adminId = Number(req.params.id);
-    const result = deleteAdmin(adminId);
+    await deleteAdmin(adminId);
 
     res.json({
       ok: true,
-      dbFileName: result.dbFileName,
     });
   } catch (error) {
     next(error);

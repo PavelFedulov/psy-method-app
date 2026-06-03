@@ -1,6 +1,6 @@
-import type Database from "better-sqlite3";
 import ExcelJS from "exceljs";
 import { stringify } from "csv-stringify/sync";
+import { query } from "../../db/postgres";
 import { formatDurationMmSs } from "../../utils/format-duration";
 
 type ExportRow = {
@@ -82,22 +82,22 @@ function mapGender(gender: string | null): string {
   }
 }
 
-function resolveSessionIds(
-  db: Database.Database,
+async function resolveSessionIds(
+  adminId: number,
   input: ExportInput,
-): number[] {
+): Promise<number[]> {
   if (input.exportAll) {
-    const rows = db
-      .prepare(
-        `
-        SELECT id
-        FROM participant_sessions
-        ORDER BY id ASC
-        `,
-      )
-      .all() as Array<{ id: number }>;
+    const result = await query<{ id: number }>(
+      `
+      SELECT id
+      FROM participant_sessions
+      WHERE admin_id = $1
+      ORDER BY id ASC
+      `,
+      [adminId],
+    );
 
-    return rows.map((row) => row.id);
+    return result.rows.map((row) => row.id);
   }
 
   const ids = normalizeSessionIds(input.sessionIds);
@@ -135,55 +135,53 @@ function mapLinkStatus(status: string): string {
   }
 }
 
-function buildExportRows(
-  db: Database.Database,
+async function buildExportRows(
+  adminId: number,
   input: ExportInput,
-): FlatExportRow[] {
-  const sessionIds = resolveSessionIds(db, input);
+): Promise<FlatExportRow[]> {
+  const sessionIds = await resolveSessionIds(adminId, input);
 
   if (sessionIds.length === 0) {
     return [];
   }
 
-  const placeholders = sessionIds.map(() => "?").join(",");
+  const rows = await query<ExportRow>(
+    `
+    SELECT
+      s.id AS session_id,
+      s.participant_code,
+      s.age,
+      s.gender,
+      s.status AS session_status,
+      s.started_at AS session_started_at,
+      s.completed_at AS session_completed_at,
+      l.id AS link_id,
+      l.token AS link_token,
+      l.status AS link_status,
+      st.id AS step_id,
+      st.step_number,
+      st.stimulus_type,
+      st.stimulus_label,
+      st.adjustable_part_label,
+      st.reference_value,
+      st.final_value,
+      st.deviation,
+      st.clicks_more,
+      st.clicks_less,
+      st.clicks_total,
+      st.time_spent_seconds,
+      st.created_at AS step_created_at
+    FROM participant_sessions s
+    JOIN participant_links l ON l.id = s.link_id
+    JOIN session_steps st ON st.session_id = s.id
+    WHERE s.admin_id = $1
+      AND s.id = ANY($2::int[])
+    ORDER BY s.id ASC, st.step_number ASC
+    `,
+    [adminId, sessionIds],
+  );
 
-  const rows = db
-    .prepare(
-      `
-      SELECT
-        s.id AS session_id,
-        s.participant_code,
-        s.age,
-        s.gender,
-        s.status AS session_status,
-        s.started_at AS session_started_at,
-        s.completed_at AS session_completed_at,
-        l.id AS link_id,
-        l.token AS link_token,
-        l.status AS link_status,
-        st.id AS step_id,
-        st.step_number,
-        st.stimulus_type,
-        st.stimulus_label,
-        st.adjustable_part_label,
-        st.reference_value,
-        st.final_value,
-        st.deviation,
-        st.clicks_more,
-        st.clicks_less,
-        st.clicks_total,
-        st.time_spent_seconds,
-        st.created_at AS step_created_at
-      FROM participant_sessions s
-      JOIN participant_links l ON l.id = s.link_id
-      JOIN session_steps st ON st.session_id = s.id
-      WHERE s.id IN (${placeholders})
-      ORDER BY s.id ASC, st.step_number ASC
-      `,
-    )
-    .all(...sessionIds) as ExportRow[];
-
-  return rows.map((row) => ({
+  return rows.rows.map((row) => ({
     sessionId: row.session_id,
     participantCode: row.participant_code,
     age: row.age,
@@ -211,8 +209,8 @@ function buildExportRows(
   }));
 }
 
-export function exportSessionsToCsv(db: Database.Database, input: ExportInput) {
-  const rows = buildExportRows(db, input);
+export async function exportSessionsToCsv(adminId: number, input: ExportInput) {
+  const rows = await buildExportRows(adminId, input);
 
   const csv = stringify(rows, {
     header: true,
@@ -247,11 +245,8 @@ export function exportSessionsToCsv(db: Database.Database, input: ExportInput) {
   return Buffer.from(csv, "utf-8");
 }
 
-export async function exportSessionsToXlsx(
-  db: Database.Database,
-  input: ExportInput,
-) {
-  const rows = buildExportRows(db, input);
+export async function exportSessionsToXlsx(adminId: number, input: ExportInput) {
+  const rows = await buildExportRows(adminId, input);
 
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Результаты");

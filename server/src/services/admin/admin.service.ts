@@ -1,8 +1,5 @@
-import type Database from "better-sqlite3";
 import { z } from "zod";
-import { coreDb } from "../../db/core/core-db";
-import { getAdminDbByFileName } from "../../db/factories/admin-db-factory";
-import { initAdminDb } from "../../db/migrations/init-admin-db";
+import { query, transaction } from "../../db/postgres";
 import { nowIso } from "../../utils/now";
 import { hashPassword } from "../../utils/password";
 
@@ -26,105 +23,94 @@ type CreateAdminInput = z.infer<typeof createAdminSchema>;
 export async function createAdmin(input: CreateAdminInput) {
   const validated = createAdminSchema.parse(input);
 
-  const existingAdmin = coreDb
-    .prepare(
+  const existingAdmin = await query<{ id: number }>(
       `
       SELECT id
       FROM admins
-      WHERE username = ?
+      WHERE username = $1
       `,
-    )
-    .get(validated.username);
+    [validated.username],
+  );
 
-  if (existingAdmin) {
+  if (existingAdmin.rows[0]) {
     throw new Error("Админ с таким логином уже существует");
   }
 
   const passwordHash = await hashPassword(validated.password);
-  const dbFileName = `admin_${validated.username}.sqlite`;
 
-  const insertResult = coreDb
-    .prepare(
+  const insertResult = await query<{ id: number }>(
       `
-      INSERT INTO admins (username, password_hash, is_active, db_file_name, created_at)
-      VALUES (?, ?, 1, ?, ?)
+      INSERT INTO admins (username, password_hash, is_active, created_at)
+      VALUES ($1, $2, TRUE, $3)
+      RETURNING id
       `,
-    )
-    .run(
-      validated.username,
-      passwordHash,
-      dbFileName,
-      nowIso(),
+    [validated.username, passwordHash, nowIso()],
   );
 
-  const adminId = Number(insertResult.lastInsertRowid);
-  let adminDb: Database.Database | undefined;
-
-  try {
-    adminDb = getAdminDbByFileName(dbFileName);
-    initAdminDb(adminDb);
-  } catch (error) {
-    coreDb.prepare("DELETE FROM admins WHERE id = ?").run(adminId);
-    throw error;
-  } finally {
-    adminDb?.close();
-  }
-
   return {
-    id: adminId,
+    id: insertResult.rows[0].id,
     username: validated.username,
-    dbFileName,
     isActive: true,
   };
 }
 
-export function getAdminsList() {
-  return coreDb
-    .prepare(
+export async function getAdminsList() {
+  const result = await query<{
+    id: number;
+    username: string;
+    isActive: boolean;
+    createdAt: string;
+  }>(
       `
-      SELECT id, username, is_active AS isActive, db_file_name AS dbFileName, created_at AS createdAt
+      SELECT id, username, is_active AS "isActive", created_at AS "createdAt"
       FROM admins
       ORDER BY id DESC
       `,
-    )
-    .all();
+  );
+
+  return result.rows;
 }
 
-export function updateAdminStatus(adminId: number, isActive: boolean) {
-  const result = coreDb
-    .prepare(
+export async function updateAdminStatus(adminId: number, isActive: boolean) {
+  const result = await query(
       `
       UPDATE admins
-      SET is_active = ?
-      WHERE id = ?
+      SET is_active = $1
+      WHERE id = $2
       `,
-    )
-    .run(isActive ? 1 : 0, adminId);
+    [isActive, adminId],
+  );
 
-  if (result.changes === 0) {
+  if (result.rowCount === 0) {
     throw new Error("Админ не найден");
   }
 }
 
-export function deleteAdmin(adminId: number) {
-  const row = coreDb
-    .prepare(
+export async function deleteAdmin(adminId: number) {
+  const deleted = await transaction(async (client) => {
+    const existing = await client.query<{ id: number }>(
       `
-      SELECT db_file_name AS dbFileName
+      SELECT id
       FROM admins
-      WHERE id = ?
+      WHERE id = $1
       `,
-    )
-    .get(adminId) as { dbFileName: string } | undefined;
+      [adminId],
+    );
 
-  if (!row) {
+    if (!existing.rows[0]) {
+      return false;
+    }
+
+    await client.query("DELETE FROM admin_sessions WHERE admin_id = $1", [
+      adminId,
+    ]);
+    await client.query("DELETE FROM admins WHERE id = $1", [adminId]);
+    return true;
+  });
+
+  if (!deleted) {
     throw new Error("Админ не найден");
   }
 
-  coreDb.prepare("DELETE FROM admin_sessions WHERE admin_id = ?").run(adminId);
-  coreDb.prepare("DELETE FROM admins WHERE id = ?").run(adminId);
-
-  return {
-    dbFileName: row.dbFileName,
-  };
+  return { ok: true };
 }

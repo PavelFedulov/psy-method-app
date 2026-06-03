@@ -5,7 +5,6 @@ export type AdminMeResponse = {
   admin: {
     id: number;
     username: string;
-    dbFileName: string;
   } | null;
 };
 
@@ -18,7 +17,6 @@ export type AdminLoginResponse = {
   admin: {
     id: number;
     username: string;
-    dbFileName: string;
   };
 };
 

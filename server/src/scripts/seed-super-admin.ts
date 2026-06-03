@@ -1,37 +1,35 @@
-import { coreDb } from "../db/core/core-db";
 import { initCoreDb } from "../db/migrations/init-core-db";
+import { query } from "../db/postgres";
 import { env } from "../config/env";
 import { hashPassword } from "../utils/password";
 import { nowIso } from "../utils/now";
 
 async function run() {
-  initCoreDb();
+  await initCoreDb();
 
-  const existing = coreDb
-    .prepare(
+  const existing = await query<{ id: number }>(
       `
       SELECT id
       FROM super_admins
-      WHERE username = ?
+      WHERE username = $1
       `,
-    )
-    .get(env.superAdminUsername);
+    [env.superAdminUsername],
+  );
 
-  if (existing) {
+  if (existing.rows[0]) {
     console.log("Super admin already exists");
     return;
   }
 
   const passwordHash = await hashPassword(env.superAdminPassword);
 
-  coreDb
-    .prepare(
+  await query(
       `
       INSERT INTO super_admins (username, password_hash, created_at)
-      VALUES (?, ?, ?)
+      VALUES ($1, $2, $3)
       `,
-    )
-    .run(env.superAdminUsername, passwordHash, nowIso());
+    [env.superAdminUsername, passwordHash, nowIso()],
+  );
 
   console.log("Super admin created");
 }

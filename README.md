@@ -6,7 +6,7 @@
 
 - Client: React + Vite + TypeScript + Tailwind
 - Server: Node.js + Express + TypeScript
-- Database: SQLite + better-sqlite3
+- Database: PostgreSQL + pg
 
 ## Run
 
@@ -20,11 +20,14 @@ npm run dev
 
 cd server
 npm install
+cp .env.example .env
+npm run db:init
+npm run seed:super-admin
 npm run dev
 
 ## Deploy
 
-Recommended setup: deploy as one Node.js web service with a persistent disk for SQLite data.
+Recommended setup: deploy as one Node.js web service with a managed PostgreSQL database.
 
 Build command:
 
@@ -45,14 +48,14 @@ NODE_ENV=production
 PORT=3001
 CLIENT_URL=https://your-domain.example
 COOKIE_SECRET=replace-with-a-long-random-secret
-CORE_DB_PATH=/opt/render/project/src/storage/core.sqlite
-ADMIN_DB_DIR=/opt/render/project/src/storage/admin-dbs
+DATABASE_URL=postgresql://user:password@host:5432/database
 SUPER_ADMIN_USERNAME=admin
 SUPER_ADMIN_PASSWORD=replace-with-a-strong-password
 ```
 
-On the first deploy, run the seed command once after the persistent disk is attached:
+On the first deploy, initialize the database and run the seed command once:
 
 ```sh
+npm --prefix server run db:init
 npm --prefix server run seed:super-admin
 ```

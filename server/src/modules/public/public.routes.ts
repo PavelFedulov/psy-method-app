@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { resolveAdminDbByParticipantToken } from "../../services/public/public-link-resolver.service";
+import { resolveAdminByParticipantToken } from "../../services/public/public-link-resolver.service";
 import {
   getPublicLinkState,
   getPublicSessionProgress,
@@ -10,97 +10,88 @@ import {
 
 const router = Router();
 
-router.get("/links/:token", (req, res, next) => {
-  const resolved = resolveAdminDbByParticipantToken(req.params.token);
-
-  if (!resolved) {
-    return res.status(404).json({
-      state: "not_found",
-    });
-  }
-
+router.get("/links/:token", async (req, res, next) => {
   try {
-    const result = getPublicLinkState(resolved.db, req.params.token);
+    const resolved = await resolveAdminByParticipantToken(req.params.token);
+
+    if (!resolved) {
+      return res.status(404).json({
+        state: "not_found",
+      });
+    }
+
+    const result = await getPublicLinkState(req.params.token);
     return res.json(result);
   } catch (error) {
     next(error);
-  } finally {
-    resolved.db.close();
   }
 });
 
-router.post("/links/:token/start", (req, res, next) => {
-  const resolved = resolveAdminDbByParticipantToken(req.params.token);
-
-  if (!resolved) {
-    return res.status(404).json({
-      error: "Ссылка не найдена",
-    });
-  }
-
+router.post("/links/:token/start", async (req, res, next) => {
   try {
-    const result = startPublicSession(resolved.db, req.params.token, req.body);
+    const resolved = await resolveAdminByParticipantToken(req.params.token);
+
+    if (!resolved) {
+      return res.status(404).json({
+        error: "Ссылка не найдена",
+      });
+    }
+
+    const result = await startPublicSession(req.params.token, req.body);
     return res.status(201).json(result);
   } catch (error) {
     next(error);
-  } finally {
-    resolved.db.close();
   }
 });
 
-router.get("/links/:token/progress", (req, res, next) => {
-  const resolved = resolveAdminDbByParticipantToken(req.params.token);
-
-  if (!resolved) {
-    return res.status(404).json({
-      state: "not_found",
-    });
-  }
-
+router.get("/links/:token/progress", async (req, res, next) => {
   try {
-    const result = getPublicSessionProgress(resolved.db, req.params.token);
+    const resolved = await resolveAdminByParticipantToken(req.params.token);
+
+    if (!resolved) {
+      return res.status(404).json({
+        state: "not_found",
+      });
+    }
+
+    const result = await getPublicSessionProgress(req.params.token);
     return res.json(result);
   } catch (error) {
     next(error);
-  } finally {
-    resolved.db.close();
   }
 });
 
-router.get("/links/:token/steps/:stepNumber", (req, res, next) => {
-  const resolved = resolveAdminDbByParticipantToken(req.params.token);
-
-  if (!resolved) {
-    return res.status(404).json({
-      error: "Ссылка не найдена",
-    });
-  }
-
+router.get("/links/:token/steps/:stepNumber", async (req, res, next) => {
   try {
+    const resolved = await resolveAdminByParticipantToken(req.params.token);
+
+    if (!resolved) {
+      return res.status(404).json({
+        error: "Ссылка не найдена",
+      });
+    }
+
     const stepNumber = Number(req.params.stepNumber);
-    const result = getPublicStep(resolved.db, req.params.token, stepNumber);
+    const result = await getPublicStep(req.params.token, stepNumber);
 
     return res.json(result);
   } catch (error) {
     next(error);
-  } finally {
-    resolved.db.close();
   }
 });
 
-router.post("/links/:token/steps/:stepNumber", (req, res, next) => {
-  const resolved = resolveAdminDbByParticipantToken(req.params.token);
-
-  if (!resolved) {
-    return res.status(404).json({
-      error: "Ссылка не найдена",
-    });
-  }
-
+router.post("/links/:token/steps/:stepNumber", async (req, res, next) => {
   try {
+    const resolved = await resolveAdminByParticipantToken(req.params.token);
+
+    if (!resolved) {
+      return res.status(404).json({
+        error: "Ссылка не найдена",
+      });
+    }
+
     const stepNumber = Number(req.params.stepNumber);
-    const result = submitPublicStep(
-      resolved.db,
+    const result = await submitPublicStep(
       req.params.token,
       stepNumber,
       req.body,
@@ -109,8 +100,6 @@ router.post("/links/:token/steps/:stepNumber", (req, res, next) => {
     return res.status(201).json(result);
   } catch (error) {
     next(error);
-  } finally {
-    resolved.db.close();
   }
 });
 

@@ -7,18 +7,20 @@ export function requireAdminAuth(
   res: Response,
   next: NextFunction,
 ) {
-  const token = req.cookies[COOKIE_NAMES.ADMIN_SESSION];
+  void (async () => {
+    const token = req.cookies[COOKIE_NAMES.ADMIN_SESSION];
 
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-  const admin = getAdminBySessionToken(token);
+    const admin = await getAdminBySessionToken(token);
 
-  if (!admin) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+    if (!admin) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-  req.admin = admin;
-  next();
+    req.admin = admin;
+    next();
+  })().catch(next);
 }

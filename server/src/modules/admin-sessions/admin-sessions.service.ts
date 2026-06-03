@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import { query, transaction } from "../../db/postgres";
 import { LINK_STATUS } from "../../constants/app.constants";
 import { formatDurationMmSs } from "../../utils/format-duration";
 
@@ -32,30 +32,30 @@ type SessionStepRow = {
   created_at: string;
 };
 
-export function getAdminSessionsList(db: Database.Database) {
-  const rows = db
-    .prepare(
-      `
-      SELECT
-        s.id,
-        s.participant_code,
-        s.age,
-        s.gender,
-        s.current_step,
-        s.status,
-        s.started_at,
-        s.last_activity_at,
-        s.completed_at,
-        s.link_id,
-        l.status AS link_status
-      FROM participant_sessions s
-      JOIN participant_links l ON l.id = s.link_id
-      ORDER BY s.id DESC
-      `,
-    )
-    .all() as SessionListRow[];
+export async function getAdminSessionsList(adminId: number) {
+  const result = await query<SessionListRow>(
+    `
+    SELECT
+      s.id,
+      s.participant_code,
+      s.age,
+      s.gender,
+      s.current_step,
+      s.status,
+      s.started_at,
+      s.last_activity_at,
+      s.completed_at,
+      s.link_id,
+      l.status AS link_status
+    FROM participant_sessions s
+    JOIN participant_links l ON l.id = s.link_id
+    WHERE s.admin_id = $1
+    ORDER BY s.id DESC
+    `,
+    [adminId],
+  );
 
-  return rows.map((row) => ({
+  return result.rows.map((row) => ({
     id: row.id,
     participantCode: row.participant_code,
     age: row.age,
@@ -70,84 +70,83 @@ export function getAdminSessionsList(db: Database.Database) {
   }));
 }
 
-export function getAdminSessionDetail(
-  db: Database.Database,
+export async function getAdminSessionDetail(
+  adminId: number,
   sessionId: number,
 ) {
-  const session = db
-    .prepare(
-      `
-      SELECT
-        s.id,
-        s.participant_code,
-        s.age,
-        s.gender,
-        s.current_step,
-        s.status,
-        s.started_at,
-        s.last_activity_at,
-        s.completed_at,
-        s.link_id,
-        l.token,
-        l.status AS link_status,
-        l.created_at AS link_created_at,
-        l.started_at AS link_started_at,
-        l.completed_at AS link_completed_at,
-        l.revoked_at AS link_revoked_at
-      FROM participant_sessions s
-      JOIN participant_links l ON l.id = s.link_id
-      WHERE s.id = ?
-      `,
-    )
-    .get(sessionId) as
-    | {
-        id: number;
-        participant_code: string;
-        age: number | null;
-        gender: string | null;
-        current_step: number;
-        status: string;
-        started_at: string;
-        last_activity_at: string;
-        completed_at: string | null;
-        link_id: number;
-        token: string;
-        link_status: string;
-        link_created_at: string;
-        link_started_at: string | null;
-        link_completed_at: string | null;
-        link_revoked_at: string | null;
-      }
-    | undefined;
+  const sessionResult = await query<{
+    id: number;
+    participant_code: string;
+    age: number | null;
+    gender: string | null;
+    current_step: number;
+    status: string;
+    started_at: string;
+    last_activity_at: string;
+    completed_at: string | null;
+    link_id: number;
+    token: string;
+    link_status: string;
+    link_created_at: string;
+    link_started_at: string | null;
+    link_completed_at: string | null;
+    link_revoked_at: string | null;
+  }>(
+    `
+    SELECT
+      s.id,
+      s.participant_code,
+      s.age,
+      s.gender,
+      s.current_step,
+      s.status,
+      s.started_at,
+      s.last_activity_at,
+      s.completed_at,
+      s.link_id,
+      l.token,
+      l.status AS link_status,
+      l.created_at AS link_created_at,
+      l.started_at AS link_started_at,
+      l.completed_at AS link_completed_at,
+      l.revoked_at AS link_revoked_at
+    FROM participant_sessions s
+    JOIN participant_links l ON l.id = s.link_id
+    WHERE s.id = $1 AND s.admin_id = $2
+    `,
+    [sessionId, adminId],
+  );
+
+  const session = sessionResult.rows[0];
 
   if (!session) {
     throw new Error("Прохождение не найдено");
   }
 
-  const steps = db
-    .prepare(
-      `
-      SELECT
-        id,
-        step_number,
-        stimulus_type,
-        stimulus_label,
-        adjustable_part_label,
-        reference_value,
-        final_value,
-        deviation,
-        clicks_more,
-        clicks_less,
-        clicks_total,
-        time_spent_seconds,
-        created_at
-      FROM session_steps
-      WHERE session_id = ?
-      ORDER BY step_number ASC
-      `,
-    )
-    .all(sessionId) as SessionStepRow[];
+  const stepsResult = await query<SessionStepRow>(
+    `
+    SELECT
+      id,
+      step_number,
+      stimulus_type,
+      stimulus_label,
+      adjustable_part_label,
+      reference_value,
+      final_value,
+      deviation,
+      clicks_more,
+      clicks_less,
+      clicks_total,
+      time_spent_seconds,
+      created_at
+    FROM session_steps
+    WHERE session_id = $1 AND admin_id = $2
+    ORDER BY step_number ASC
+    `,
+    [sessionId, adminId],
+  );
 
+  const steps = stepsResult.rows;
   const totalTimeSeconds = steps.reduce(
     (sum, step) => sum + step.time_spent_seconds,
     0,
@@ -198,61 +197,64 @@ export function getAdminSessionDetail(
   };
 }
 
-export function deleteAdminSession(db: Database.Database, sessionId: number) {
-  const session = db
-    .prepare(
+export async function deleteAdminSession(adminId: number, sessionId: number) {
+  const deleted = await transaction(async (client) => {
+    const sessionResult = await client.query<{ id: number; link_id: number }>(
       `
       SELECT id, link_id
       FROM participant_sessions
-      WHERE id = ?
+      WHERE id = $1 AND admin_id = $2
       `,
-    )
-    .get(sessionId) as
-    | {
-        id: number;
-        link_id: number;
-      }
-    | undefined;
+      [sessionId, adminId],
+    );
 
-  if (!session) {
-    throw new Error("Прохождение не найдено");
-  }
+    const session = sessionResult.rows[0];
 
-  const transaction = db.transaction(() => {
-    db.prepare(
+    if (!session) {
+      return false;
+    }
+
+    await client.query(
       `
       DELETE FROM session_steps
-      WHERE session_id = ?
+      WHERE session_id = $1 AND admin_id = $2
       `,
-    ).run(sessionId);
+      [sessionId, adminId],
+    );
 
-    db.prepare(
+    await client.query(
       `
       DELETE FROM participant_sessions
-      WHERE id = ?
+      WHERE id = $1 AND admin_id = $2
       `,
-    ).run(sessionId);
+      [sessionId, adminId],
+    );
 
-    db.prepare(
+    await client.query(
       `
       UPDATE participant_links
       SET
-        status = ?,
+        status = $1,
         started_at = NULL,
         completed_at = NULL,
         revoked_at = NULL
-      WHERE id = ?
+      WHERE id = $2 AND admin_id = $3
       `,
-    ).run(LINK_STATUS.NEW, session.link_id);
+      [LINK_STATUS.NEW, session.link_id, adminId],
+    );
+
+    return true;
   });
 
-  transaction();
+  if (!deleted) {
+    throw new Error("Прохождение не найдено");
+  }
 
   return { ok: true };
 }
 
-export function bulkDeleteAdminSessions(
-  db: Database.Database,
+export async function bulkDeleteAdminSessions(
+  adminId: number,
   sessionIds: number[],
 ) {
   if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
@@ -267,60 +269,59 @@ export function bulkDeleteAdminSessions(
     throw new Error("Некорректный список session id");
   }
 
-  let deletedCount = 0;
+  const deletedCount = await transaction(async (client) => {
+    let count = 0;
 
-  const transaction = db.transaction(() => {
     for (const sessionId of normalizedIds) {
-      const session = db
-        .prepare(
-          `
-          SELECT id, link_id
-          FROM participant_sessions
-          WHERE id = ?
-          `,
-        )
-        .get(sessionId) as
-        | {
-            id: number;
-            link_id: number;
-          }
-        | undefined;
+      const sessionResult = await client.query<{ id: number; link_id: number }>(
+        `
+        SELECT id, link_id
+        FROM participant_sessions
+        WHERE id = $1 AND admin_id = $2
+        `,
+        [sessionId, adminId],
+      );
+
+      const session = sessionResult.rows[0];
 
       if (!session) {
         continue;
       }
 
-      deletedCount += 1;
+      count += 1;
 
-      db.prepare(
+      await client.query(
         `
         DELETE FROM session_steps
-        WHERE session_id = ?
+        WHERE session_id = $1 AND admin_id = $2
         `,
-      ).run(sessionId);
+        [sessionId, adminId],
+      );
 
-      db.prepare(
+      await client.query(
         `
         DELETE FROM participant_sessions
-        WHERE id = ?
+        WHERE id = $1 AND admin_id = $2
         `,
-      ).run(sessionId);
+        [sessionId, adminId],
+      );
 
-      db.prepare(
+      await client.query(
         `
         UPDATE participant_links
         SET
-          status = ?,
+          status = $1,
           started_at = NULL,
           completed_at = NULL,
           revoked_at = NULL
-        WHERE id = ?
+        WHERE id = $2 AND admin_id = $3
         `,
-      ).run(LINK_STATUS.NEW, session.link_id);
+        [LINK_STATUS.NEW, session.link_id, adminId],
+      );
     }
-  });
 
-  transaction();
+    return count;
+  });
 
   return {
     ok: true,

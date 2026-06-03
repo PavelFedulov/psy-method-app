@@ -1,21 +1,20 @@
-import { coreDb } from "../../db/core/core-db";
-import { getAdminDbByFileName } from "../../db/factories/admin-db-factory";
+import { query } from "../../db/postgres";
 
 type LinkIndexRow = {
   admin_id: number;
-  db_file_name: string;
 };
 
-export function resolveAdminDbByParticipantToken(token: string) {
-  const row = coreDb
-    .prepare(
+export async function resolveAdminByParticipantToken(token: string) {
+  const result = await query<LinkIndexRow>(
       `
-      SELECT admin_id, db_file_name
-      FROM participant_link_index
-      WHERE token = ?
+      SELECT admin_id
+      FROM participant_links
+      WHERE token = $1
       `,
-    )
-    .get(token) as LinkIndexRow | undefined;
+    [token],
+  );
+
+  const row = result.rows[0];
 
   if (!row) {
     return null;
@@ -23,7 +22,5 @@ export function resolveAdminDbByParticipantToken(token: string) {
 
   return {
     adminId: row.admin_id,
-    dbFileName: row.db_file_name,
-    db: getAdminDbByFileName(row.db_file_name),
   };
 }

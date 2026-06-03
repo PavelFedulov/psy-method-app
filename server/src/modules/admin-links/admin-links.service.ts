@@ -1,5 +1,4 @@
-import type Database from "better-sqlite3";
-import { coreDb } from "../../db/core/core-db";
+import { query } from "../../db/postgres";
 import { LINK_STATUS } from "../../constants/app.constants";
 import { nowIso } from "../../utils/now";
 import { generateParticipantToken } from "../../utils/token";
@@ -15,77 +14,43 @@ type ParticipantLinkRow = {
 };
 
 type CreateParticipantLinkParams = {
-  db: Database.Database;
   adminId: number;
-  dbFileName: string;
 };
 
-export function createParticipantLink(params: CreateParticipantLinkParams) {
-  const { db, adminId, dbFileName } = params;
-
+export async function createParticipantLink(params: CreateParticipantLinkParams) {
   const token = generateParticipantToken();
   const createdAt = nowIso();
 
-  coreDb
-    .prepare(
-      `
-      INSERT INTO participant_link_index (
-        admin_id,
-        db_file_name,
-        token,
-        created_at
-      )
-      VALUES (?, ?, ?, ?)
-      `,
+  const result = await query<{ id: number }>(
+    `
+    INSERT INTO participant_links (
+      admin_id,
+      token,
+      status,
+      created_at,
+      started_at,
+      completed_at,
+      revoked_at
     )
-    .run(adminId, dbFileName, token, createdAt);
+    VALUES ($1, $2, $3, $4, NULL, NULL, NULL)
+    RETURNING id
+    `,
+    [params.adminId, token, LINK_STATUS.NEW, createdAt],
+  );
 
-  try {
-    const transaction = db.transaction(() => {
-      const result = db
-        .prepare(
-          `
-          INSERT INTO participant_links (
-            token,
-            status,
-            created_at,
-            started_at,
-            completed_at,
-            revoked_at
-          )
-          VALUES (?, ?, ?, NULL, NULL, NULL)
-          `,
-        )
-        .run(token, LINK_STATUS.NEW, createdAt);
-
-      return {
-        id: Number(result.lastInsertRowid),
-        token,
-        status: LINK_STATUS.NEW,
-        createdAt,
-        startedAt: null,
-        completedAt: null,
-        revokedAt: null,
-      };
-    });
-
-    return transaction();
-  } catch (error) {
-    coreDb
-      .prepare(
-        `
-        DELETE FROM participant_link_index
-        WHERE token = ?
-        `,
-      )
-      .run(token);
-    throw error;
-  }
+  return {
+    id: result.rows[0].id,
+    token,
+    status: LINK_STATUS.NEW,
+    createdAt,
+    startedAt: null,
+    completedAt: null,
+    revokedAt: null,
+  };
 }
 
-export function getParticipantLinks(db: Database.Database) {
-  const rows = db
-    .prepare(
+export async function getParticipantLinks(adminId: number) {
+  const result = await query<ParticipantLinkRow>(
       `
       SELECT
         id,
@@ -96,12 +61,13 @@ export function getParticipantLinks(db: Database.Database) {
         completed_at,
         revoked_at
       FROM participant_links
+      WHERE admin_id = $1
       ORDER BY id DESC
       `,
-    )
-    .all() as ParticipantLinkRow[];
+    [adminId],
+  );
 
-  return rows.map((row) => ({
+  return result.rows.map((row) => ({
     id: row.id,
     token: row.token,
     status: row.status,
@@ -112,18 +78,21 @@ export function getParticipantLinks(db: Database.Database) {
   }));
 }
 
-export function revokeParticipantLink(db: Database.Database, linkId: number) {
-  const link = db
-    .prepare(
+export async function revokeParticipantLink(adminId: number, linkId: number) {
+  const result = await query<{
+    id: number;
+    status: string;
+    revoked_at: string | null;
+  }>(
       `
       SELECT id, status, revoked_at
       FROM participant_links
-      WHERE id = ?
+      WHERE id = $1 AND admin_id = $2
       `,
-    )
-    .get(linkId) as
-    | { id: number; status: string; revoked_at: string | null }
-    | undefined;
+    [linkId, adminId],
+  );
+
+  const link = result.rows[0];
 
   if (!link) {
     throw new Error("Ссылка не найдена");
@@ -137,77 +106,68 @@ export function revokeParticipantLink(db: Database.Database, linkId: number) {
     throw new Error("Ссылка уже отозвана");
   }
 
-  db.prepare(
+  await query(
     `
     UPDATE participant_links
-    SET status = ?, revoked_at = ?
-    WHERE id = ?
+    SET status = $1, revoked_at = $2
+    WHERE id = $3 AND admin_id = $4
     `,
-  ).run(LINK_STATUS.REVOKED, nowIso(), linkId);
+    [LINK_STATUS.REVOKED, nowIso(), linkId, adminId],
+  );
 
   return { ok: true };
 }
 
 export function deleteUnusedParticipantLink(
-  db: Database.Database,
+  adminId: number,
   linkId: number,
 ) {
-  const link = db
-    .prepare(
+  return deleteUnusedParticipantLinkAsync(adminId, linkId);
+}
+
+async function deleteUnusedParticipantLinkAsync(adminId: number, linkId: number) {
+  const result = await query<{
+    id: number;
+    token: string;
+    status: string;
+    started_at: string | null;
+    completed_at: string | null;
+  }>(
       `
       SELECT id, token, status, started_at, completed_at
       FROM participant_links
-      WHERE id = ?
+      WHERE id = $1 AND admin_id = $2
       `,
-    )
-    .get(linkId) as
-    | {
-        id: number;
-        token: string;
-        status: string;
-        started_at: string | null;
-        completed_at: string | null;
-      }
-    | undefined;
+    [linkId, adminId],
+  );
+
+  const link = result.rows[0];
 
   if (!link) {
     throw new Error("Ссылка не найдена");
   }
 
-  const hasSession = db
-    .prepare(
+  const hasSession = await query<{ id: number }>(
       `
       SELECT id
       FROM participant_sessions
-      WHERE link_id = ?
+      WHERE link_id = $1 AND admin_id = $2
       LIMIT 1
       `,
-    )
-    .get(linkId);
+    [linkId, adminId],
+  );
 
-  if (hasSession || link.started_at || link.completed_at) {
+  if (hasSession.rows[0] || link.started_at || link.completed_at) {
     throw new Error("Можно удалить только неиспользованную ссылку");
   }
 
-  const transaction = db.transaction(() => {
-    db.prepare(
-      `
-      DELETE FROM participant_links
-      WHERE id = ?
-      `,
-    ).run(linkId);
-
-    coreDb
-      .prepare(
-        `
-        DELETE FROM participant_link_index
-        WHERE token = ?
-        `,
-      )
-      .run(link.token);
-  });
-
-  transaction();
+  await query(
+    `
+    DELETE FROM participant_links
+    WHERE id = $1 AND admin_id = $2
+    `,
+    [linkId, adminId],
+  );
 
   return { ok: true };
 }

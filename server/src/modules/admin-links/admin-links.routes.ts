@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { requireAdminAuth } from "../../middlewares/require-admin-auth";
-import { attachAdminDb } from "../../middlewares/attach-admin-db";
 import {
   createParticipantLink,
   deleteUnusedParticipantLink,
@@ -11,18 +10,15 @@ import {
 const router = Router();
 
 router.use(requireAdminAuth);
-router.use(attachAdminDb);
 
-router.post("/", (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
-    if (!req.adminDb || !req.admin) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const link = createParticipantLink({
-      db: req.adminDb,
+    const link = await createParticipantLink({
       adminId: req.admin.id,
-      dbFileName: req.admin.dbFileName,
     });
 
     return res.status(201).json({ link });
@@ -31,13 +27,13 @@ router.post("/", (req, res, next) => {
   }
 });
 
-router.get("/", (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const links = getParticipantLinks(req.adminDb);
+    const links = await getParticipantLinks(req.admin.id);
 
     return res.json({ links });
   } catch (error) {
@@ -45,14 +41,14 @@ router.get("/", (req, res, next) => {
   }
 });
 
-router.post("/:id/revoke", (req, res, next) => {
+router.post("/:id/revoke", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const linkId = Number(req.params.id);
-    const result = revokeParticipantLink(req.adminDb, linkId);
+    const result = await revokeParticipantLink(req.admin.id, linkId);
 
     return res.json(result);
   } catch (error) {
@@ -60,14 +56,14 @@ router.post("/:id/revoke", (req, res, next) => {
   }
 });
 
-router.delete("/:id", (req, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const linkId = Number(req.params.id);
-    const result = deleteUnusedParticipantLink(req.adminDb, linkId);
+    const result = await deleteUnusedParticipantLink(req.admin.id, linkId);
 
     return res.json(result);
   } catch (error) {

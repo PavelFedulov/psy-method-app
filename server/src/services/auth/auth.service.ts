@@ -1,4 +1,4 @@
-import { coreDb } from "../../db/core/core-db";
+import { query } from "../../db/postgres";
 import { nowIso } from "../../utils/now";
 import {
   generateSessionToken,
@@ -16,8 +16,7 @@ type AdminRow = {
   id: number;
   username: string;
   password_hash: string;
-  is_active: number;
-  db_file_name: string;
+  is_active: boolean;
 };
 
 function getExpiryIso(days: number): string {
@@ -27,15 +26,16 @@ function getExpiryIso(days: number): string {
 }
 
 export async function loginSuperAdmin(username: string, password: string) {
-  const row = coreDb
-    .prepare(
+  const result = await query<SuperAdminRow>(
       `
       SELECT id, username, password_hash
       FROM super_admins
-      WHERE username = ?
+      WHERE username = $1
       `,
-    )
-    .get(username) as SuperAdminRow | undefined;
+    [username],
+  );
+
+  const row = result.rows[0];
 
   if (!row) {
     throw new Error("Неверный логин или пароль");
@@ -50,14 +50,13 @@ export async function loginSuperAdmin(username: string, password: string) {
   const rawToken = generateSessionToken();
   const tokenHash = hashSessionToken(rawToken);
 
-  coreDb
-    .prepare(
+  await query(
       `
       INSERT INTO super_admin_sessions (super_admin_id, session_token_hash, created_at, expires_at)
-      VALUES (?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4)
       `,
-    )
-    .run(row.id, tokenHash, nowIso(), getExpiryIso(7));
+    [row.id, tokenHash, nowIso(), getExpiryIso(7)],
+  );
 
   return {
     token: rawToken,
@@ -69,15 +68,16 @@ export async function loginSuperAdmin(username: string, password: string) {
 }
 
 export async function loginAdmin(username: string, password: string) {
-  const row = coreDb
-    .prepare(
+  const result = await query<AdminRow>(
       `
-      SELECT id, username, password_hash, is_active, db_file_name
+      SELECT id, username, password_hash, is_active
       FROM admins
-      WHERE username = ?
+      WHERE username = $1
       `,
-    )
-    .get(username) as AdminRow | undefined;
+    [username],
+  );
+
+  const row = result.rows[0];
 
   if (!row || !row.is_active) {
     throw new Error("Неверный логин или пароль");
@@ -92,82 +92,78 @@ export async function loginAdmin(username: string, password: string) {
   const rawToken = generateSessionToken();
   const tokenHash = hashSessionToken(rawToken);
 
-  coreDb
-    .prepare(
+  await query(
       `
       INSERT INTO admin_sessions (admin_id, session_token_hash, created_at, expires_at)
-      VALUES (?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4)
       `,
-    )
-    .run(row.id, tokenHash, nowIso(), getExpiryIso(7));
+    [row.id, tokenHash, nowIso(), getExpiryIso(7)],
+  );
 
   return {
     token: rawToken,
     admin: {
       id: row.id,
       username: row.username,
-      dbFileName: row.db_file_name,
     },
   };
 }
 
-export function logoutSuperAdmin(rawToken: string) {
+export async function logoutSuperAdmin(rawToken: string) {
   const tokenHash = hashSessionToken(rawToken);
 
-  coreDb
-    .prepare(
+  await query(
       `
       DELETE FROM super_admin_sessions
-      WHERE session_token_hash = ?
+      WHERE session_token_hash = $1
       `,
-    )
-    .run(tokenHash);
+    [tokenHash],
+  );
 }
 
-export function logoutAdmin(rawToken: string) {
+export async function logoutAdmin(rawToken: string) {
   const tokenHash = hashSessionToken(rawToken);
 
-  coreDb
-    .prepare(
+  await query(
       `
       DELETE FROM admin_sessions
-      WHERE session_token_hash = ?
+      WHERE session_token_hash = $1
       `,
-    )
-    .run(tokenHash);
+    [tokenHash],
+  );
 }
 
-export function getSuperAdminBySessionToken(rawToken: string) {
+export async function getSuperAdminBySessionToken(rawToken: string) {
   const tokenHash = hashSessionToken(rawToken);
 
-  return coreDb
-    .prepare(
+  const result = await query<{ id: number; username: string }>(
       `
       SELECT sa.id, sa.username
       FROM super_admin_sessions sas
       JOIN super_admins sa ON sa.id = sas.super_admin_id
-      WHERE sas.session_token_hash = ?
-        AND sas.expires_at > ?
+      WHERE sas.session_token_hash = $1
+        AND sas.expires_at > $2
       `,
-    )
-    .get(tokenHash, nowIso()) as { id: number; username: string } | undefined;
+    [tokenHash, nowIso()],
+  );
+
+  return result.rows[0];
 }
 
-export function getAdminBySessionToken(rawToken: string) {
+export async function getAdminBySessionToken(rawToken: string) {
   const tokenHash = hashSessionToken(rawToken);
 
-  return coreDb
-    .prepare(
+  const result = await query<{ id: number; username: string }>(
       `
-      SELECT a.id, a.username, a.db_file_name AS dbFileName
+      SELECT a.id, a.username
       FROM admin_sessions s
       JOIN admins a ON a.id = s.admin_id
-      WHERE s.session_token_hash = ?
-        AND s.expires_at > ?
-        AND a.is_active = 1
+      WHERE s.session_token_hash = $1
+        AND s.expires_at > $2
+        AND a.is_active = TRUE
       `,
-    )
-    .get(tokenHash, nowIso()) as
-    | { id: number; username: string; dbFileName: string }
-    | undefined;
+    [tokenHash, nowIso()],
+  );
+
+  return result.rows[0];
 }

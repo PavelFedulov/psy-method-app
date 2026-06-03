@@ -1,5 +1,6 @@
-import type Database from "better-sqlite3";
+import type { PoolClient } from "pg";
 import { z } from "zod";
+import { query, transaction } from "../../db/postgres";
 import {
   LINK_STATUS,
   SESSION_STATUS,
@@ -10,6 +11,7 @@ import { nowIso } from "../../utils/now";
 
 type ParticipantLinkRow = {
   id: number;
+  admin_id: number;
   token: string;
   status: string;
   started_at: string | null;
@@ -19,6 +21,7 @@ type ParticipantLinkRow = {
 
 type ParticipantSessionRow = {
   id: number;
+  admin_id: number;
   link_id: number;
   participant_code: string;
   age: number;
@@ -37,33 +40,48 @@ const submitStepSchema = z.object({
   timeSpentSeconds: z.number().int().min(0),
 });
 
-function getLinkByToken(db: Database.Database, token: string) {
-  return db
-    .prepare(
-      `
-      SELECT id, token, status, started_at, completed_at, revoked_at
-      FROM participant_links
-      WHERE token = ?
-      `,
-    )
-    .get(token) as ParticipantLinkRow | undefined;
+async function getLinkByToken(token: string, client?: PoolClient) {
+  const sql = `
+    SELECT id, admin_id, token, status, started_at, completed_at, revoked_at
+    FROM participant_links
+    WHERE token = $1
+    `;
+  const params = [token];
+  const result = client
+    ? await client.query<ParticipantLinkRow>(sql, params)
+    : await query<ParticipantLinkRow>(sql, params);
+
+  return result.rows[0];
 }
 
-function getSessionByLinkId(db: Database.Database, linkId: number) {
-  return db
-    .prepare(
-      `
-      SELECT id, link_id, participant_code, current_step, status, started_at, last_activity_at, completed_at
-      FROM participant_sessions
-      WHERE link_id = ?
-      LIMIT 1
-      `,
-    )
-    .get(linkId) as ParticipantSessionRow | undefined;
+async function getSessionByLinkId(linkId: number, client?: PoolClient) {
+  const sql = `
+    SELECT
+      id,
+      admin_id,
+      link_id,
+      participant_code,
+      age,
+      gender,
+      current_step,
+      status,
+      started_at,
+      last_activity_at,
+      completed_at
+    FROM participant_sessions
+    WHERE link_id = $1
+    LIMIT 1
+    `;
+  const params = [linkId];
+  const result = client
+    ? await client.query<ParticipantSessionRow>(sql, params)
+    : await query<ParticipantSessionRow>(sql, params);
+
+  return result.rows[0];
 }
 
-export function getPublicLinkState(db: Database.Database, token: string) {
-  const link = getLinkByToken(db, token);
+export async function getPublicLinkState(token: string) {
+  const link = await getLinkByToken(token);
 
   if (!link) {
     return {
@@ -71,7 +89,7 @@ export function getPublicLinkState(db: Database.Database, token: string) {
     };
   }
 
-  const session = getSessionByLinkId(db, link.id);
+  const session = await getSessionByLinkId(link.id);
 
   if (link.status === LINK_STATUS.REVOKED) {
     return {
@@ -118,15 +136,12 @@ type StartPublicSessionInput = {
   consentAccepted: boolean;
 };
 
-export function startPublicSession(
-  db: Database.Database,
+export async function startPublicSession(
   token: string,
   input: StartPublicSessionInput,
 ) {
   const participantCode = String(input.participantCode ?? "").trim();
-
   const age = Number(input.age);
-
   const gender = String(input.gender ?? "").trim();
 
   if (!participantCode) {
@@ -145,108 +160,106 @@ export function startPublicSession(
     throw new Error("Необходимо принять информированное согласие");
   }
 
-  const link = getLinkByToken(db, token);
+  return transaction(async (client) => {
+    const link = await getLinkByToken(token, client);
 
-  if (!link) {
-    throw new Error("Ссылка не найдена");
-  }
-
-  if (link.status === LINK_STATUS.REVOKED) {
-    throw new Error("Ссылка отозвана");
-  }
-
-  if (link.status === LINK_STATUS.COMPLETED) {
-    throw new Error("Прохождение по ссылке уже завершено");
-  }
-
-  const existingSessionByLink = getSessionByLinkId(db, link.id);
-
-  if (existingSessionByLink) {
-    if (existingSessionByLink.participant_code !== participantCode) {
-      throw new Error(
-        "Для этой ссылки уже начато прохождение с другим participant ID",
-      );
+    if (!link) {
+      throw new Error("Ссылка не найдена");
     }
 
-    return {
-      sessionId: existingSessionByLink.id,
-      participantCode: existingSessionByLink.participant_code,
-      currentStep: existingSessionByLink.current_step,
-      status: existingSessionByLink.status,
-      resumed: true,
-    };
-  }
+    if (link.status === LINK_STATUS.REVOKED) {
+      throw new Error("Ссылка отозвана");
+    }
 
-  const existingParticipantCode = db
-    .prepare(
+    if (link.status === LINK_STATUS.COMPLETED) {
+      throw new Error("Прохождение по ссылке уже завершено");
+    }
+
+    const existingSessionByLink = await getSessionByLinkId(link.id, client);
+
+    if (existingSessionByLink) {
+      if (existingSessionByLink.participant_code !== participantCode) {
+        throw new Error(
+          "Для этой ссылки уже начато прохождение с другим participant ID",
+        );
+      }
+
+      return {
+        sessionId: existingSessionByLink.id,
+        participantCode: existingSessionByLink.participant_code,
+        currentStep: existingSessionByLink.current_step,
+        status: existingSessionByLink.status,
+        resumed: true,
+      };
+    }
+
+    const existingParticipantCode = await client.query<{ id: number }>(
       `
       SELECT id
       FROM participant_sessions
-      WHERE participant_code = ?
+      WHERE participant_code = $1
       LIMIT 1
       `,
-    )
-    .get(participantCode);
+      [participantCode],
+    );
 
-  if (existingParticipantCode) {
-    throw new Error("Такой participant ID уже существует");
-  }
+    if (existingParticipantCode.rows[0]) {
+      throw new Error("Такой participant ID уже существует");
+    }
 
-  const createdAt = nowIso();
+    const createdAt = nowIso();
 
-  const transaction = db.transaction(() => {
-    const insertResult = db
-      .prepare(
-        `
-        INSERT INTO participant_sessions (
-          link_id,
-          participant_code,
-          age,
-          gender,
-          consent_accepted,
-          current_step,
-          status,
-          started_at,
-          last_activity_at,
-          completed_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-        `,
+    const insertResult = await client.query<{ id: number }>(
+      `
+      INSERT INTO participant_sessions (
+        admin_id,
+        link_id,
+        participant_code,
+        age,
+        gender,
+        consent_accepted,
+        current_step,
+        status,
+        started_at,
+        last_activity_at,
+        completed_at
       )
-      .run(
+      VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $8, NULL)
+      RETURNING id
+      `,
+      [
+        link.admin_id,
         link.id,
         participantCode,
         age,
         gender,
-        1,
-        1,
+        true,
         SESSION_STATUS.IN_PROGRESS,
         createdAt,
-        createdAt,
-      );
+      ],
+    );
 
-    db.prepare(
+    await client.query(
       `
       UPDATE participant_links
-      SET status = ?, started_at = ?
-      WHERE id = ?
+      SET status = $1, started_at = $2
+      WHERE id = $3
       `,
-    ).run(LINK_STATUS.IN_PROGRESS, createdAt, link.id);
+      [LINK_STATUS.IN_PROGRESS, createdAt, link.id],
+    );
 
     return {
-      sessionId: Number(insertResult.lastInsertRowid),
+      sessionId: insertResult.rows[0].id,
       participantCode,
       currentStep: 1,
       status: SESSION_STATUS.IN_PROGRESS,
       resumed: false,
     };
   });
-
-  return transaction();
 }
 
-export function getPublicSessionProgress(db: Database.Database, token: string) {
-  const link = getLinkByToken(db, token);
+export async function getPublicSessionProgress(token: string) {
+  const link = await getLinkByToken(token);
 
   if (!link) {
     return {
@@ -260,7 +273,7 @@ export function getPublicSessionProgress(db: Database.Database, token: string) {
     };
   }
 
-  const session = getSessionByLinkId(db, link.id);
+  const session = await getSessionByLinkId(link.id);
 
   if (!session) {
     return {
@@ -295,8 +308,7 @@ export function getPublicSessionProgress(db: Database.Database, token: string) {
   };
 }
 
-export function getPublicStep(
-  db: Database.Database,
+export async function getPublicStep(
   token: string,
   requestedStepNumber: number,
 ) {
@@ -308,7 +320,7 @@ export function getPublicStep(
     throw new Error("Некорректный номер шага");
   }
 
-  const link = getLinkByToken(db, token);
+  const link = await getLinkByToken(token);
 
   if (!link) {
     throw new Error("Ссылка не найдена");
@@ -318,7 +330,7 @@ export function getPublicStep(
     throw new Error("Ссылка отозвана");
   }
 
-  const session = getSessionByLinkId(db, link.id);
+  const session = await getSessionByLinkId(link.id);
 
   if (!session) {
     throw new Error("Сессия еще не начата");
@@ -356,8 +368,7 @@ export function getPublicStep(
   };
 }
 
-export function submitPublicStep(
-  db: Database.Database,
+export async function submitPublicStep(
   token: string,
   requestedStepNumber: number,
   input: unknown,
@@ -372,77 +383,76 @@ export function submitPublicStep(
 
   const parsed = submitStepSchema.parse(input);
 
-  const link = getLinkByToken(db, token);
+  return transaction(async (client) => {
+    const link = await getLinkByToken(token, client);
 
-  if (!link) {
-    throw new Error("Ссылка не найдена");
-  }
+    if (!link) {
+      throw new Error("Ссылка не найдена");
+    }
 
-  if (link.status === LINK_STATUS.REVOKED) {
-    throw new Error("Ссылка отозвана");
-  }
+    if (link.status === LINK_STATUS.REVOKED) {
+      throw new Error("Ссылка отозвана");
+    }
 
-  if (link.status === LINK_STATUS.COMPLETED) {
-    throw new Error("Прохождение уже завершено");
-  }
+    if (link.status === LINK_STATUS.COMPLETED) {
+      throw new Error("Прохождение уже завершено");
+    }
 
-  const session = getSessionByLinkId(db, link.id);
+    const session = await getSessionByLinkId(link.id, client);
 
-  if (!session) {
-    throw new Error("Сессия еще не начата");
-  }
+    if (!session) {
+      throw new Error("Сессия еще не начата");
+    }
 
-  if (session.status === SESSION_STATUS.COMPLETED) {
-    throw new Error("Прохождение уже завершено");
-  }
+    if (session.status === SESSION_STATUS.COMPLETED) {
+      throw new Error("Прохождение уже завершено");
+    }
 
-  if (requestedStepNumber !== session.current_step) {
-    throw new Error(`Сейчас доступен только шаг ${session.current_step}`);
-  }
+    if (requestedStepNumber !== session.current_step) {
+      throw new Error(`Сейчас доступен только шаг ${session.current_step}`);
+    }
 
-  const stimulus = getStimulusByStep(requestedStepNumber);
+    const stimulus = getStimulusByStep(requestedStepNumber);
 
-  if (!stimulus) {
-    throw new Error("Конфиг шага не найден");
-  }
+    if (!stimulus) {
+      throw new Error("Конфиг шага не найден");
+    }
 
-  const minAllowedValue = Math.max(1, stimulus.referenceValue - 20);
+    const minAllowedValue = Math.max(1, stimulus.referenceValue - 20);
+    const maxAllowedValue = stimulus.referenceValue + 20;
 
-  const maxAllowedValue = stimulus.referenceValue + 20;
+    if (
+      parsed.finalValue < minAllowedValue ||
+      parsed.finalValue > maxAllowedValue
+    ) {
+      throw new Error(
+        `Значение должно быть в диапазоне от ${minAllowedValue} до ${maxAllowedValue}`,
+      );
+    }
 
-  if (
-    parsed.finalValue < minAllowedValue ||
-    parsed.finalValue > maxAllowedValue
-  ) {
-    throw new Error(
-      `Значение должно быть в диапазоне от ${minAllowedValue} до ${maxAllowedValue}`,
-    );
-  }
-
-  const existingStep = db
-    .prepare(
+    const existingStep = await client.query<{ id: number }>(
       `
       SELECT id
       FROM session_steps
-      WHERE session_id = ? AND step_number = ?
+      WHERE session_id = $1 AND step_number = $2
       LIMIT 1
       `,
-    )
-    .get(session.id, requestedStepNumber);
+      [session.id, requestedStepNumber],
+    );
 
-  if (existingStep) {
-    throw new Error("Этот шаг уже сохранен");
-  }
+    if (existingStep.rows[0]) {
+      throw new Error("Этот шаг уже сохранен");
+    }
 
-  const clicksTotal = parsed.clicksMore + parsed.clicksLess;
-  const deviation = Math.abs(parsed.finalValue - stimulus.referenceValue);
-  const createdAt = nowIso();
-  const isFinalStep = requestedStepNumber === TOTAL_STEPS;
+    const clicksTotal = parsed.clicksMore + parsed.clicksLess;
+    const deviation = Math.abs(parsed.finalValue - stimulus.referenceValue);
+    const createdAt = nowIso();
+    const isFinalStep = requestedStepNumber === TOTAL_STEPS;
 
-  const transaction = db.transaction(() => {
-    db.prepare(
+    await client.query(
       `
       INSERT INTO session_steps (
+        admin_id,
         session_id,
         step_number,
         stimulus_type,
@@ -457,46 +467,44 @@ export function submitPublicStep(
         time_spent_seconds,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       `,
-    ).run(
-      session.id,
-      requestedStepNumber,
-      stimulus.stimulusType,
-      stimulus.stimulusLabel,
-      stimulus.adjustablePartLabel,
-      stimulus.referenceValue,
-      parsed.finalValue,
-      deviation,
-      parsed.clicksMore,
-      parsed.clicksLess,
-      clicksTotal,
-      parsed.timeSpentSeconds,
-      createdAt,
+      [
+        session.admin_id,
+        session.id,
+        requestedStepNumber,
+        stimulus.stimulusType,
+        stimulus.stimulusLabel,
+        stimulus.adjustablePartLabel,
+        stimulus.referenceValue,
+        parsed.finalValue,
+        deviation,
+        parsed.clicksMore,
+        parsed.clicksLess,
+        clicksTotal,
+        parsed.timeSpentSeconds,
+        createdAt,
+      ],
     );
 
     if (isFinalStep) {
-      db.prepare(
+      await client.query(
         `
         UPDATE participant_sessions
-        SET current_step = ?, status = ?, last_activity_at = ?, completed_at = ?
-        WHERE id = ?
+        SET current_step = $1, status = $2, last_activity_at = $3, completed_at = $3
+        WHERE id = $4
         `,
-      ).run(
-        TOTAL_STEPS,
-        SESSION_STATUS.COMPLETED,
-        createdAt,
-        createdAt,
-        session.id,
+        [TOTAL_STEPS, SESSION_STATUS.COMPLETED, createdAt, session.id],
       );
 
-      db.prepare(
+      await client.query(
         `
         UPDATE participant_links
-        SET status = ?, completed_at = ?
-        WHERE id = ?
+        SET status = $1, completed_at = $2
+        WHERE id = $3
         `,
-      ).run(LINK_STATUS.COMPLETED, createdAt, link.id);
+        [LINK_STATUS.COMPLETED, createdAt, link.id],
+      );
 
       return {
         savedStepNumber: requestedStepNumber,
@@ -507,13 +515,14 @@ export function submitPublicStep(
 
     const nextStep = requestedStepNumber + 1;
 
-    db.prepare(
+    await client.query(
       `
       UPDATE participant_sessions
-      SET current_step = ?, last_activity_at = ?
-      WHERE id = ?
+      SET current_step = $1, last_activity_at = $2
+      WHERE id = $3
       `,
-    ).run(nextStep, createdAt, session.id);
+      [nextStep, createdAt, session.id],
+    );
 
     return {
       savedStepNumber: requestedStepNumber,
@@ -521,6 +530,4 @@ export function submitPublicStep(
       nextStep,
     };
   });
-
-  return transaction();
 }

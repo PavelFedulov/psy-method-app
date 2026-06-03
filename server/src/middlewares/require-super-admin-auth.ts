@@ -7,18 +7,20 @@ export function requireSuperAdminAuth(
   res: Response,
   next: NextFunction,
 ) {
-  const token = req.cookies[COOKIE_NAMES.SUPER_ADMIN_SESSION];
+  void (async () => {
+    const token = req.cookies[COOKIE_NAMES.SUPER_ADMIN_SESSION];
 
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-  const superAdmin = getSuperAdminBySessionToken(token);
+    const superAdmin = await getSuperAdminBySessionToken(token);
 
-  if (!superAdmin) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+    if (!superAdmin) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-  req.superAdmin = superAdmin;
-  next();
+    req.superAdmin = superAdmin;
+    next();
+  })().catch(next);
 }

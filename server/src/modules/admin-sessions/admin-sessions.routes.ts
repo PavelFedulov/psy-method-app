@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { requireAdminAuth } from "../../middlewares/require-admin-auth";
-import { attachAdminDb } from "../../middlewares/attach-admin-db";
 import {
   bulkDeleteAdminSessions,
   deleteAdminSession,
@@ -11,29 +10,28 @@ import {
 const router = Router();
 
 router.use(requireAdminAuth);
-router.use(attachAdminDb);
 
-router.get("/", (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const sessions = getAdminSessionsList(req.adminDb);
+    const sessions = await getAdminSessionsList(req.admin.id);
     return res.json({ sessions });
   } catch (error) {
     next(error);
   }
 });
 
-router.post("/bulk-delete", (req, res, next) => {
+router.post("/bulk-delete", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const { sessionIds } = req.body as { sessionIds: number[] };
-    const result = bulkDeleteAdminSessions(req.adminDb, sessionIds);
+    const result = await bulkDeleteAdminSessions(req.admin.id, sessionIds);
 
     return res.json(result);
   } catch (error) {
@@ -41,14 +39,14 @@ router.post("/bulk-delete", (req, res, next) => {
   }
 });
 
-router.get("/:id", (req, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const sessionId = Number(req.params.id);
-    const result = getAdminSessionDetail(req.adminDb, sessionId);
+    const result = await getAdminSessionDetail(req.admin.id, sessionId);
 
     return res.json(result);
   } catch (error) {
@@ -56,14 +54,14 @@ router.get("/:id", (req, res, next) => {
   }
 });
 
-router.delete("/:id", (req, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
-    if (!req.adminDb) {
-      return res.status(500).json({ error: "Admin DB not attached" });
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const sessionId = Number(req.params.id);
-    const result = deleteAdminSession(req.adminDb, sessionId);
+    const result = await deleteAdminSession(req.admin.id, sessionId);
 
     return res.json(result);
   } catch (error) {
