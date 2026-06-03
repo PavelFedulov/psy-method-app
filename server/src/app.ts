@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import fs from "fs";
+import path from "path";
 
 import { env } from "./config/env";
 import publicRoutes from "./modules/public/public.routes";
@@ -11,6 +13,9 @@ import exportRoutes from "./modules/export/export.routes";
 import superAdminRoutes from "./modules/super-admin/super-admin.routes";
 import { notFoundHandler } from "./middlewares/not-found";
 import { errorHandler } from "./middlewares/error-handler";
+
+const clientDistPath = path.resolve(process.cwd(), "../client/dist");
+const clientIndexPath = path.join(clientDistPath, "index.html");
 
 export function createApp() {
   const app = express();
@@ -36,7 +41,18 @@ export function createApp() {
   app.use("/api/admin/export", exportRoutes);
   app.use("/api/super-admin", superAdminRoutes);
 
-  app.use(notFoundHandler);
+  app.use("/api", notFoundHandler);
+
+  if (fs.existsSync(clientIndexPath)) {
+    app.use(express.static(clientDistPath));
+
+    app.get(/.*/, (_req, res) => {
+      res.sendFile(clientIndexPath);
+    });
+  } else {
+    app.use(notFoundHandler);
+  }
+
   app.use(errorHandler);
 
   return app;
