@@ -13,7 +13,10 @@ function getEnv(name: string, fallback?: string): string {
 
 export const env = {
   port: Number(getEnv("PORT", "3001")),
-  clientUrl: getEnv("CLIENT_URL", "http://localhost:5173"),
+  clientUrl: getEnv(
+    "CLIENT_URL",
+    process.env.RENDER_EXTERNAL_URL ?? "http://localhost:5173",
+  ),
   cookieSecret: getEnv("COOKIE_SECRET"),
   databaseUrl: getEnv("DATABASE_URL"),
   superAdminUsername: getEnv("SUPER_ADMIN_USERNAME"),

@@ -3,6 +3,8 @@ import { env } from "../config/env";
 
 export const pool = new Pool({
   connectionString: env.databaseUrl,
+  connectionTimeoutMillis: 5000,
+  // Render's internal PostgreSQL endpoint uses a self-signed TLS certificate.
   ssl: env.isProduction ? { rejectUnauthorized: false } : undefined,
 });
 

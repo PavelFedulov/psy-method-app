@@ -25,12 +25,12 @@ npm run dev
 
 ## Deploy
 
-Recommended setup: deploy as one Node.js web service with a managed PostgreSQL database.
+Recommended setup: Render Blueprint with one Node.js web service and managed PostgreSQL. See [DEPLOY.md](./DEPLOY.md) for the complete Russian-language guide. The infrastructure configuration is in [render.yaml](./render.yaml).
 
 Build command:
 
 ```sh
-npm ci --include=dev && npm --prefix client ci --include=dev && npm --prefix server ci --include=dev && npm run build
+npm run deploy:build
 ```
 
 Start command:

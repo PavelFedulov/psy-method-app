@@ -13,11 +13,15 @@ import exportRoutes from "./modules/export/export.routes";
 import superAdminRoutes from "./modules/super-admin/super-admin.routes";
 import { notFoundHandler } from "./middlewares/not-found";
 import { errorHandler } from "./middlewares/error-handler";
+import { query } from "./db/postgres";
 
-const clientDistPath = path.resolve(process.cwd(), "../client/dist");
+const clientDistPath = path.resolve(__dirname, "../../client/dist");
 const clientIndexPath = path.join(clientDistPath, "index.html");
 
 export function createApp() {
+  if (env.isProduction && !fs.existsSync(clientIndexPath)) {
+    throw new Error("Client build missing. Run npm run build before starting the server.");
+  }
   const app = express();
 
   app.use(
@@ -30,8 +34,13 @@ export function createApp() {
   app.use(express.json());
   app.use(cookieParser(env.cookieSecret));
 
-  app.get("/api/health", (_req, res) => {
-    res.json({ ok: true });
+  app.get("/api/health", async (_req, res) => {
+    try {
+      await query("SELECT 1");
+      res.json({ ok: true });
+    } catch {
+      res.status(503).json({ ok: false });
+    }
   });
 
   app.use("/api/public", publicRoutes);
