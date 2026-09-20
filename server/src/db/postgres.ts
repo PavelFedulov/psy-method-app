@@ -1,11 +1,23 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { env } from "../config/env";
 
+const databaseUrl = new URL(env.databaseUrl);
+if (env.isProduction) {
+  // Neon is reached over the public network; verify its certificate and hostname.
+  databaseUrl.searchParams.set("sslmode", "verify-full");
+}
+
 export const pool = new Pool({
-  connectionString: env.databaseUrl,
-  connectionTimeoutMillis: 5000,
-  // Render's internal PostgreSQL endpoint uses a self-signed TLS certificate.
-  ssl: env.isProduction ? { rejectUnauthorized: false } : undefined,
+  connectionString: databaseUrl.toString(),
+  // Allow time for the first connection after Neon's scale-to-zero.
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 10000,
+  max: 5,
+});
+
+// A suspended/restarted database can close an idle connection.
+pool.on("error", () => {
+  console.error("Unexpected error on idle PostgreSQL connection");
 });
 
 export async function query<T extends QueryResultRow>(

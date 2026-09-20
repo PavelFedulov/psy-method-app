@@ -14,20 +14,8 @@ services:
       - key: COOKIE_SECRET
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: psy-method-db
-          property: connectionString
+        sync: false
       - key: SUPER_ADMIN_USERNAME
         sync: false
       - key: SUPER_ADMIN_PASSWORD
         sync: false
-
-databases:
-  - name: psy-method-db
-    region: frankfurt
-    plan: 0.1c-256mb
-    diskSizeGB: 5
-    postgresMajorVersion: "18"
-    databaseName: psy_method
-    user: psy_method
-    ipAllowList: []

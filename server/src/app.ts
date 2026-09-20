@@ -13,7 +13,6 @@ import exportRoutes from "./modules/export/export.routes";
 import superAdminRoutes from "./modules/super-admin/super-admin.routes";
 import { notFoundHandler } from "./middlewares/not-found";
 import { errorHandler } from "./middlewares/error-handler";
-import { query } from "./db/postgres";
 
 const clientDistPath = path.resolve(__dirname, "../../client/dist");
 const clientIndexPath = path.join(clientDistPath, "index.html");
@@ -34,13 +33,9 @@ export function createApp() {
   app.use(express.json());
   app.use(cookieParser(env.cookieSecret));
 
-  app.get("/api/health", async (_req, res) => {
-    try {
-      await query("SELECT 1");
-      res.json({ ok: true });
-    } catch {
-      res.status(503).json({ ok: false });
-    }
+  // Liveness only: Render probes must not keep Neon compute awake.
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
   });
 
   app.use("/api/public", publicRoutes);

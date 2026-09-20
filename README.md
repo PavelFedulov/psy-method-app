@@ -25,7 +25,7 @@ npm run dev
 
 ## Deploy
 
-Recommended setup: Render Blueprint with one Node.js web service and managed PostgreSQL. See [DEPLOY.md](./DEPLOY.md) for the complete Russian-language guide. The infrastructure configuration is in [render.yaml](./render.yaml).
+Recommended setup: one paid Render Node.js web service + Neon Free PostgreSQL. The Blueprint creates only the web service; create the database in Neon and enter its pooled connection URL as the DATABASE_URL secret in Render. See [DEPLOY.md](./DEPLOY.md) for the complete Russian-language guide and [render.yaml](./render.yaml) for the service configuration.
 
 Build command:
 
@@ -43,12 +43,13 @@ Production environment variables:
 
 ```sh
 NODE_ENV=production
-PORT=3001
 CLIENT_URL=https://your-domain.example
 COOKIE_SECRET=replace-with-a-long-random-secret
-DATABASE_URL=postgresql://user:password@host:5432/database
+DATABASE_URL=postgresql://USER:PASSWORD@ep-EXAMPLE-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=verify-full
 SUPER_ADMIN_USERNAME=admin
 SUPER_ADMIN_PASSWORD=replace-with-a-strong-password
 ```
 
 The server initializes database tables and creates the initial super admin automatically on startup if they do not exist.
+
+Render assigns PORT automatically. `/api/health` checks the web process without querying PostgreSQL so Neon can suspend while idle. Production database connections verify TLS certificates.
